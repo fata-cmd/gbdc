@@ -73,8 +73,7 @@ double ScaledEntropyFromOccurenceCounts(std::unordered_map<int64_t, int64_t> occ
     return log2(summands.size()) == 0 ? 0 : (double)entropy / log2(summands.size());
 }
 
-double ScaledEntropy(std::vector<unsigned> distribution)
-{
+double ScaledEntropy(std::vector<unsigned> distribution){
     std::unordered_map<int64_t, int64_t> occurence;
     for (unsigned value : distribution)
     {
@@ -84,6 +83,18 @@ double ScaledEntropy(std::vector<unsigned> distribution)
         }
         else
         {
+            occurence[value] = 1;
+        }
+    }
+    return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
+}
+
+double ScaledEntropy(std::vector<int> distribution) {
+    std::unordered_map<int64_t, int64_t> occurence;
+    for (unsigned value : distribution) {
+        if (occurence.count(value)) {
+            occurence[value] = occurence[value] + 1;
+        } else {
             occurence[value] = 1;
         }
     }
@@ -143,37 +154,8 @@ void push_distribution(std::vector<double> &record, std::vector<T> distribution)
     record.insert(record.end(), {mean, variance, min, max, entropy});
 }
 
-inline size_t numDigits(unsigned x)
-{
-    if (x >= 10000)
-    {
-        if (x >= 10000000)
-        {
-            if (x >= 100000000)
-            {
-                if (x >= 1000000000)
-                    return 10;
-                return 9;
-            }
-            return 8;
-        }
-        if (x >= 100000)
-        {
-            if (x >= 1000000)
-                return 7;
-            return 6;
-        }
-        return 5;
-    }
-    if (x >= 100)
-    {
-        if (x >= 1000)
-            return 4;
-        return 3;
-    }
-    if (x >= 10)
-        return 2;
-    return 1;
+inline size_t numDigits(unsigned x){
+    return ceil(log10(x));
 }
 
 class UnionFind
