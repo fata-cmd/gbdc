@@ -9,8 +9,16 @@ on:
     branches: [ "master" ]
 
 jobs:
+  install:
+    name: Install libarchive
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install libarchive
+        run: sudo apt install -y libarchive-dev
+        
   build:
     runs-on: ${{ matrix.os }}
+    needs: install
 
     strategy:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
@@ -46,9 +54,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-
-    - name: Install libarchive
-      run: sudo apt install -y libarchive-dev
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
