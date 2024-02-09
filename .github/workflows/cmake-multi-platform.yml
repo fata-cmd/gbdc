@@ -51,12 +51,18 @@ jobs:
       with: 
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+    - name: Set up Cygwin
+      uses: egor-tensin/setup-cygwin@v4
+      with:
+        packages: libarchive-devel-3.7.2-2 cmake gcc-g++
+        
+
     - name: Install libarchive
       run:   |
          if [ "$RUNNER_OS" == "Linux" ]; then
               sudo apt install libarchive-dev
          elif [ "$RUNNER_OS" == "Windows" ]; then
-              choco install archive
+              libarchive-devel-3.7.2-2
          else
               echo "$RUNNER_OS not supported"
               exit 1
