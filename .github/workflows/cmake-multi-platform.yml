@@ -71,8 +71,12 @@ jobs:
       id: strings
       shell: bash
       run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
-
+        if [ "${{ runner.os }}" == "Linux" ]; then
+          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+        elif [ "${{ runner.os }}" == "Windows" ]; then
+          echo "build-output-dir=${{ github.workspace }}\\build" >> "$GITHUB_OUTPUT"
+        fi
+        
     - name: TestOutputDir
       shell: bash
       run: |
