@@ -70,7 +70,7 @@ jobs:
       shell: bash
       run: |
         if [ "$RUNNER_OS" == "Windows" ]; then
-          echo "build-output-dir=${{ github.workspace }}\\build" >> "$GITHUB_OUTPUT"
+          echo "build-output-dir=${{ github.workspace }}\build" >> "$GITHUB_OUTPUT"
         else
           echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
         fi
