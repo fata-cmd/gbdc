@@ -57,7 +57,7 @@ jobs:
       if: runner.os == 'Windows'
       uses: egor-tensin/setup-cygwin@v4
       with:
-        packages: libarchive-devel-3.7.2-2 cmake gcc g++
+        packages: libarchive-devel-3.7.2-2 cmake gcc
         
 
     - name: Install libarchive
