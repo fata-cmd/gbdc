@@ -51,7 +51,8 @@ jobs:
       with: 
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Set up Cygwin
+    - name: Set up Cygwin on Windows
+      if: runner.os == 'Windows'
       uses: egor-tensin/setup-cygwin@v4
       with:
         packages: libarchive-devel-3.7.2-2 cmake gcc-g++
@@ -61,8 +62,6 @@ jobs:
       run:   |
          if [ "$RUNNER_OS" == "Linux" ]; then
               sudo apt install libarchive-dev
-         elif [ "$RUNNER_OS" == "Windows" ]; then
-              libarchive-devel-3.7.2-2
          else
               echo "$RUNNER_OS not supported"
               exit 1
