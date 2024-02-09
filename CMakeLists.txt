@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.10)
 
 project(gbdc VERSION 1.0)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
@@ -44,3 +46,5 @@ add_dependencies(gbdc solver)
 target_link_libraries(gbdc PUBLIC ${LIBS} solver $<TARGET_OBJECTS:gates> $<TARGET_OBJECTS:util> $<TARGET_OBJECTS:transform> $<TARGET_OBJECTS:extract>)
 
 target_include_directories(gbdc PUBLIC "${PROJECT_SOURCE_DIR}")
+
+add_test(NAME Test COMMAND "build/src/test")
