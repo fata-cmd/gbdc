@@ -67,6 +67,7 @@ jobs:
       shell: bash
 
     - name: Set reusable strings
+      if: runner.os == 'Linux'
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
       shell: bash
@@ -74,7 +75,7 @@ jobs:
         if [ "${{ runner.os }}" == "Linux" ]; then
           echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
         elif [ "${{ runner.os }}" == "Windows" ]; then
-          echo "build-output-dir=${{ github.workspace }}\build" >> "$GITHUB_OUTPUT"
+          echo "build-output-dir=${{ github.workspace }}" >> "$GITHUB_OUTPUT"
         fi
         
     - name: TestOutputDir
