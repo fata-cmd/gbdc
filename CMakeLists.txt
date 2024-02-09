@@ -47,4 +47,4 @@ target_link_libraries(gbdc PUBLIC ${LIBS} solver $<TARGET_OBJECTS:gates> $<TARGE
 
 target_include_directories(gbdc PUBLIC "${PROJECT_SOURCE_DIR}")
 
-add_test(NAME Test COMMAND "build/src/test")
+add_test(NAME SomeTests COMMAND "build/src/tests")
