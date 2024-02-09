@@ -97,4 +97,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: build-artifacts
-        path: $GITHUB_OUTPUT
+        path: ${{ steps.strings.outputs.build-output-dir }}
