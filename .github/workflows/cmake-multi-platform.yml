@@ -51,7 +51,7 @@ jobs:
     - name: Install libarchive
       run:   |
          if [ "$RUNNER_OS" == "Linux" ]; then
-              apt install libarchive-dev
+              sudo apt install libarchive-dev
          elif [ "$RUNNER_OS" == "Windows" ]; then
               choco install archive
          else
