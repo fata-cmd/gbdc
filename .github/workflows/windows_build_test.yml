@@ -51,7 +51,7 @@ jobs:
       id: strings
       shell: bash
       run: |
-          echo "build-output-dir=${{ github.workspace }}" >> "$GITHUB_OUTPUT"
+          echo "build-output-dir=${{ github.workspace }}" >> "$env:GITHUB_OUTPUT"
         
     - name: TestOutputDir
       shell: bash
