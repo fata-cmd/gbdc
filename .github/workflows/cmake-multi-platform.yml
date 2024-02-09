@@ -9,12 +9,6 @@ on:
     branches: [ "master" ]
 
 jobs:
-  install:
-    name: Install libarchive
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install libarchive
-        run: sudo apt install -y libarchive-dev
         
   build:
     runs-on: ${{ matrix.os }}
@@ -54,6 +48,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Install libarchive
+        run: sudo apt install -y libarchive-dev
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
