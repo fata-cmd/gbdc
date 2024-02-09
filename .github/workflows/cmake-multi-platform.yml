@@ -51,7 +51,7 @@ jobs:
       with: 
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Set up Cygwin on Windows
+    - name: Set up Cygwin on Windows and install libarchive
       if: runner.os == 'Windows'
       uses: egor-tensin/setup-cygwin@v4
       with:
@@ -59,13 +59,9 @@ jobs:
         
 
     - name: Install libarchive
+      if: runner.os == 'Linux'
       run:   |
-         if [ "$RUNNER_OS" == "Linux" ]; then
-              sudo apt install libarchive-dev
-         else
-              echo "$RUNNER_OS not supported"
-              exit 1
-         fi
+         sudo apt install libarchive-dev
       shell: bash
 
     - name: Set reusable strings
