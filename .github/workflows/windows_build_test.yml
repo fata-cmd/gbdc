@@ -26,24 +26,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         build_type: [Release]
-        c_compiler: [gcc, clang, cl]
+        c_compiler: [cl]
         include:
           - os: windows-latest
             c_compiler: cl
             cpp_compiler: cl
-          - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
-          - os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
-        exclude:
-          - os: windows-latest
-            c_compiler: gcc
-          - os: windows-latest
-            c_compiler: clang
-          - os: ubuntu-latest
-            c_compiler: cl
 
     steps:
     - uses: actions/checkout@v3
@@ -59,23 +46,12 @@ jobs:
       with:
         packages: libarchive-devel-3.7.2-2 cmake gcc
         
-
-    - name: Install libarchive
-      if: runner.os == 'Linux'
-      run:   |
-         sudo apt install libarchive-dev
-      shell: bash
-
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
       shell: bash
       run: |
-        if [ "${{ runner.os }}" == "Linux" ]; then
-          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
-        else
           echo "build-output-dir=${{ github.workspace }}" >> "$GITHUB_OUTPUT"
-        fi
         
     - name: TestOutputDir
       shell: bash
