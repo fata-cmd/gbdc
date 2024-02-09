@@ -47,9 +47,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-      with:
-        ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
-        fetch-depth: 1
+    - uses: webfactory/ssh-agent@v0.9.0
+      with: 
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Install libarchive
       run:   |
