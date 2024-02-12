@@ -43,8 +43,8 @@ jobs:
     - name: Install libarchive
       run:   |
          brew install libarchive
-         echo 'export PATH="/opt/homebrew/opt/libarchive/bin:$PATH"' >> ~/.bashrc
-      shell: bash
+         echo 'export PATH="/usr/local/opt/libarchive/bin:$PATH"' >> /Users/runner/.bash_profile
+         shell: bash
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
