@@ -31,6 +31,10 @@ endif()
 add_library(solver STATIC IMPORTED)
 add_dependencies(solver cadical_external)
 set_target_properties(solver PROPERTIES IMPORTED_LOCATION "${CADICAL_LIB}")
+
+if(APPLE)
+    set(LibArchive_INCLUDE_DIR "/usr/local/opt/libarchive/include")
+endif()
     
 find_package(LibArchive REQUIRED)
 include_directories(${LibArchive_INCLUDE_DIRS})
