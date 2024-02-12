@@ -40,10 +40,10 @@ jobs:
       with: 
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    #- name: Install libarchive
-     # run:   |
-      #   brew install libarchive
-      #shell: bash
+    - name: Install libarchive
+      run:   |
+         brew install libarchive
+      shell: bash
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
