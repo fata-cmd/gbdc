@@ -4,7 +4,7 @@ name: CMake on multiple platforms
 
 on:
   push:
-    branches: [ "macos-build" ]
+    branches: [ "master" ]
     
 jobs:
         
@@ -55,8 +55,6 @@ jobs:
     - name: Configure CMake
       working-directory: ${{ github.workspace }}
       run: |
-        export LDFLAGS="-L/usr/local/opt/libarchive/lib"
-        export CPPFLAGS="-I/usr/local/opt/libarchive/include"
         cmake -B ${{ steps.strings.outputs.build-output-dir }} \
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} \
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
