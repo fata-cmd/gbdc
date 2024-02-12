@@ -4,7 +4,7 @@ name: CMake on multiple platforms
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "macos-build" ]
     
 jobs:
         
@@ -43,7 +43,6 @@ jobs:
     - name: Install libarchive
       run:   |
          brew install libarchive
-         echo 'export PATH="/usr/local/opt/libarchive/bin:$PATH"' >> /Users/runner/.bashrc
       shell: bash
 
     - name: Set reusable strings
