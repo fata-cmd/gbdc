@@ -42,7 +42,7 @@ jobs:
 
     - name: Install libarchive
       run:   |
-         brew install libarchivem
+         brew install libarchive
       shell: bash
 
     - name: Set reusable strings
