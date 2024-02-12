@@ -43,6 +43,7 @@ jobs:
     - name: Install libarchive
       run:   |
          brew install libarchive
+         echo 'export PATH="/opt/homebrew/opt/libarchive/bin:$PATH"' >> ~/.bashrc
       shell: bash
 
     - name: Set reusable strings
