@@ -28,40 +28,48 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <unordered_map>
 
 template <typename T>
-double Mean(std::vector<T> distribution) {
+double Mean(std::vector<T> distribution)
+{
     double mean = 0.0;
-    for (size_t i = 0; i < distribution.size(); i++) {
+    for (size_t i = 0; i < distribution.size(); i++)
+    {
         mean += (distribution[i] - mean) / (i + 1);
     }
     return mean;
 }
 
 template <typename T>
-double Variance(std::vector<T> distribution, double mean) {
+double Variance(std::vector<T> distribution, double mean)
+{
     double vari = 0.0;
-    for (size_t i = 0; i < distribution.size(); i++) {
+    for (size_t i = 0; i < distribution.size(); i++)
+    {
         double diff = distribution[i] - mean;
-        vari += (diff*diff - vari) / (i + 1);
+        vari += (diff * diff - vari) / (i + 1);
     }
     return vari;
 }
 
-double ScaledEntropyFromOccurenceCounts(std::unordered_map<int64_t, int64_t> occurence, size_t total) {
+double ScaledEntropyFromOccurenceCounts(std::unordered_map<int64_t, int64_t> occurence, size_t total)
+{
     // collect and sort summands
     std::vector<long double> summands;
-    for (auto& pair : occurence) {
+    for (auto &pair : occurence)
+    {
         long double p_x = (long double)pair.second / (long double)total;
         long double summand = p_x * log2(p_x);
         // long double summand = (pair.second * log2(pair.second) - pair.second * log2(total)) / total;
         summands.push_back(summand);
     }
-    std::sort(summands.begin(), summands.end(), [] (long double a, long double b) { return abs(a) < abs(b); });
+    std::sort(summands.begin(), summands.end(), [](long double a, long double b)
+              { return abs(a) < abs(b); });
     // calculate entropy
     long double entropy = 0;
-    for (long double summand : summands) {
+    for (long double summand : summands)
+    {
         entropy -= summand;
     }
-    // scale by log of number of categories    
+    // scale by log of number of categories
     return log2(summands.size()) == 0 ? 0 : (double)entropy / log2(summands.size());
 }
 
@@ -89,26 +97,36 @@ double ScaledEntropy(std::vector<int> distribution) {
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
 
-double ScaledEntropy(std::vector<uint64_t> distribution) {
+double ScaledEntropy(std::vector<uint64_t> distribution)
+{
     std::unordered_map<int64_t, int64_t> occurence;
-    for (unsigned value : distribution) {
-        if (occurence.count(value)) {
+    for (unsigned value : distribution)
+    {
+        if (occurence.count(value))
+        {
             occurence[value] = occurence[value] + 1;
-        } else {
+        }
+        else
+        {
             occurence[value] = 1;
         }
     }
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
 
-double ScaledEntropy(std::vector<double> distribution) {
+double ScaledEntropy(std::vector<double> distribution)
+{
     std::unordered_map<int64_t, int64_t> occurence;
-    for (double value : distribution) {
+    for (double value : distribution)
+    {
         // snap to 3 digits after decimal point
-        int64_t snap = static_cast<int64_t>(std::round(1000*value));
-        if (occurence.count(value)) {
+        int64_t snap = static_cast<int64_t>(std::round(1000 * value));
+        if (occurence.count(value))
+        {
             occurence[value] = occurence[value] + 1;
-        } else {
+        }
+        else
+        {
             occurence[value] = 1;
         }
     }
@@ -116,9 +134,11 @@ double ScaledEntropy(std::vector<double> distribution) {
 }
 
 template <typename T>
-void push_distribution(std::vector<double>& record, std::vector<T> distribution) {
-    if (distribution.size() == 0) {
-        record.insert(record.end(), { 0, 0, 0, 0, 0 });
+void push_distribution(std::vector<double> &record, std::vector<T> distribution)
+{
+    if (distribution.size() == 0)
+    {
+        record.insert(record.end(), {0, 0, 0, 0, 0});
         return;
     }
     std::sort(distribution.begin(), distribution.end());
