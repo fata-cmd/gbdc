@@ -201,16 +201,6 @@ private:
         }
     };
     vwrapper<Var> ccs;
-    /**
-     * @brief Finds all predecessor-variables for a given variable and returns their pointers.
-     * The last predecessor is the representative of the component.
-     * If no predecessors are found, the given variable %v is inserted into
-     * the data structure with itself as its only predecessor.
-     * @param v Variable for which to find all predecessors.
-     * @return Vector of predecessor-pointers, with the last one being the representative
-     * of the component %v belongs to.
-     */
-
 public:
     UnionFind() : ccs() {}
     
@@ -223,11 +213,16 @@ public:
      */
     inline void insert(const Cl &cl)
     {
-        Var min_var = Var(UINT_MAX);
-        for (const Lit &lit : cl)
-            min_var.id = std::min(min_var.id, find(lit.var()).id);
-        for (const Lit &lit : cl)
-            ccs[lit.var()] = min_var;
+        Var min_var = Var(cl.front().var()), par;
+        for (const Lit &lit : cl) {
+            par = find(lit.var());
+            if (min_var > par){
+                ccs[min_var] = par;
+                min_var = par;
+            } else {
+                ccs[par] = min_var;
+            }
+        }
     }
 
     inline Var find(Var var)
