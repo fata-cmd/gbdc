@@ -38,7 +38,8 @@ gbdc.egg-info/
 .idea/
 build-artifacts*.zip
 benchmarks/
-test*
+test.cnf
+test.db
 
 # autotools output
 configure
