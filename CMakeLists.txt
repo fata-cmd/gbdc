@@ -17,7 +17,7 @@ else()
     message(STATUS "Building Cadical")
     include(ExternalProject)
     ExternalProject_Add(cadical_external
-        GIT_REPOSITORY git@github.com:arminbiere/cadical.git 
+        GIT_REPOSITORY https://github.com/arminbiere/cadical.git
         GIT_TAG master
         PREFIX solvers
         CONFIGURE_COMMAND ./configure "CXXFLAGS=-fPIC"
