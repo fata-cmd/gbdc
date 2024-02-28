@@ -1,9 +1,3 @@
-/**
- * Some tests for gbdc
- * 
- * @author Markus Iser 
- */
-
 #include <stdio.h>
 #include <filesystem>
 #include <iostream>
