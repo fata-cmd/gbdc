@@ -6,11 +6,12 @@
 #include <string>
 
 #include "src/extract/CNFBaseFeatures.h"
+#include "src/test/Util.h"
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
-std::unordered_map<std::string, double> expected_records = {
+std::unordered_map<std::string, double> expected_record = {
     {"clauses", 1.59684e+06},
     {"variables", 505536},
     {"bytes", 3.29527e+07},
@@ -79,13 +80,17 @@ bool fequal(double a, double b){
 
 TEST_CASE("CNFBaseFeatures")
 {
-    CNF::BaseFeatures stats("src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf");
+    const char* cnf_file = "src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf";
+    const char* expected_record_file = "src/test/resources/expected_record.txt";
+    std::unordered_map<std::string, double> expected_record = record_to_map(expected_record_file);
+    CNF::BaseFeatures stats(cnf_file);
     stats.extract();
     std::vector<double> record = stats.getFeatures();
     std::vector<std::string> names = stats.getNames();
-    CHECK(record.size() == expected_records.size());
+    CHECK(record.size() == expected_record.size());
     for (unsigned i = 0; i < record.size(); i++)
     {
-        CHECK_MESSAGE(fequal(expected_records[names[i]],record[i]), ("\nUnexpected record for feature '" + names[i] + "'\nExpected: " + std::to_string(expected_records[names[i]]) + "\nActual: " + std::to_string(record[i])));
+        CHECK_MESSAGE(fequal(expected_record[names[i]],record[i]), ("\nUnexpected record for feature '" + names[i] + "'\nExpected: " + std::to_string(expected_record[names[i]]) + "\nActual: " + std::to_string(record[i])));
     }
 }
+

@@ -17,7 +17,7 @@ else()
     message(STATUS "Building Cadical")
     include(ExternalProject)
     ExternalProject_Add(cadical_external
-        GIT_REPOSITORY https://github.com/arminbiere/cadical.git
+        GIT_REPOSITORY git@github.com:arminbiere/cadical.git 
         GIT_TAG master
         PREFIX solvers
         CONFIGURE_COMMAND ./configure "CXXFLAGS=-fPIC"
@@ -53,3 +53,4 @@ target_include_directories(gbdc PUBLIC "${PROJECT_SOURCE_DIR}")
 
 add_test(NAME Test_StreamBuffer COMMAND "src/test/tests_streambuffer")
 add_test(NAME Test_CNFBaseFeatures COMMAND "src/test/tests_cnfbasefeatures")
+add_test(NAME Test_StreamCompressor COMMAND "src/test/tests_streamcompressor")
