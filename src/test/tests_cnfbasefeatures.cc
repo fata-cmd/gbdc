@@ -80,7 +80,7 @@ bool fequal(double a, double b){
 
 TEST_CASE("CNFBaseFeatures")
 {
-    const char* cnf_file = "src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf";
+    const char* cnf_file = "src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf.xz";
     const char* expected_record_file = "src/test/resources/expected_record.txt";
     std::unordered_map<std::string, double> expected_record = record_to_map(expected_record_file);
     CNF::BaseFeatures stats(cnf_file);
