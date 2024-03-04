@@ -151,7 +151,7 @@ void push_distribution(std::vector<double> &record, std::vector<T> distribution)
     double min = distribution.front();
     double max = distribution.back();
     double entropy = ScaledEntropy(distribution);
-    record.insert(record.end(), {mean, variance, min, max, entropy});
+    record.insert(record.end(), { mean, variance, min, max, entropy });
 }
 
 inline size_t numDigits(unsigned x){

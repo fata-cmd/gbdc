@@ -70,12 +70,11 @@ std::unordered_map<std::string, double> expected_records = {
     {"cg_degree_max", 28665},
     {"cg_degree_entropy", 0.782888}};
 
-
-bool fequal(double a, double b){
+bool fequal(double a, double b)
+{
     double epsilon = fmax(fabs(a), fabs(b)) * 1e-5;
     return fabs(a - b) <= epsilon;
 }
-
 
 TEST_CASE("CNFBaseFeatures")
 {
@@ -86,6 +85,6 @@ TEST_CASE("CNFBaseFeatures")
     CHECK(record.size() == expected_records.size());
     for (unsigned i = 0; i < record.size(); i++)
     {
-        CHECK_MESSAGE(fequal(expected_records[names[i]],record[i]), ("\nUnexpected record for feature '" + names[i] + "'\nExpected: " + std::to_string(expected_records[names[i]]) + "\nActual: " + std::to_string(record[i])));
+        CHECK_MESSAGE(fequal(expected_records[names[i]], record[i]), ("\nUnexpected record for feature '" + names[i] + "'\nExpected: " + std::to_string(expected_records[names[i]]) + "\nActual: " + std::to_string(record[i])));
     }
 }
