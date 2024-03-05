@@ -40,6 +40,8 @@ build-artifacts*.zip
 benchmarks/
 test.cnf
 test.db
+build.sh
+
 
 # autotools output
 configure

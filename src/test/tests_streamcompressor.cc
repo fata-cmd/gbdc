@@ -71,18 +71,21 @@ int main()
     const char *cnf_file = "resources/test.cnf";
     StreamBuffer cnf_buf(cnf_file);
 
-    StreamCompressor cmpr(tmp_arch);
-    std::ifstream in(cnf_file);
-    in >> cmpr;
+    const char *data = "\np cnf 1 2\n1 2 0\n1 0\n-2 3 0";
+    size_t data_size = strlen(data);
+    StreamCompressor cmpr(tmp_arch, data_size);
+    cmpr.write(data, data_size);
+    // std::ifstream in(cnf_file);
+    // in >> cmpr;
     cmpr.close();
-    in.close();
+    // in.close();
     StreamBuffer tmp_buf(tmp_arch);
 
     Cl tmp_cl, cnf_cl;
-    bool eq = true;
-    while (eq)
-    {
-        eq = cnf_buf.readClause(cnf_cl) == tmp_buf.readClause(tmp_cl);
-        eq = cnf_cl == tmp_cl;
-    }
+    while(tmp_buf.readClause(tmp_cl));
+    // bool eq = true;
+    // while (eq)
+    // {
+    //     auto a = tmp_buf.skipLine();
+    // }
 }

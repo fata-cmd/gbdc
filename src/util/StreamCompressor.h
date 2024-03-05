@@ -46,7 +46,6 @@ class StreamCompressor
 public:
     StreamCompressor(const char *output, unsigned size = 0) : size_(size), cursor(0), status(0)
     {
-        std::filesystem::path p(output);
         a = archive_write_new();
         archive_write_set_format_pax_restricted(a);
         status = archive_write_add_filter_xz(a);
@@ -55,24 +54,26 @@ public:
         status = archive_write_open_filename(a, output);
         if (status != ARCHIVE_OK)
             throw StreamCompressorException("Error open archive");
-        
+
         entry = archive_entry_new();
+
+        std::filesystem::path p(output);
         auto entry_path = p.filename();
         std::cerr << entry_path.extension() << "\n";
         if (entry_path.extension() == ".xz"){
             entry_path.replace_extension();
         }
-        std::cerr << entry_path.extension() << "\n";
+        std::cerr << entry_path << "\n";
         archive_entry_set_pathname(entry, entry_path.c_str());
         if (size_ != 0)
-            init_entry(size, output);
+            init_entry(size);
     }
 
     ~StreamCompressor()
     {
     }
 
-    void init_entry(unsigned size, const char *entry_path)
+    void init_entry(unsigned size)
     {
         size_ = size;
         archive_entry_set_size(entry, size);
@@ -90,7 +91,7 @@ public:
     void write(const char *buf, unsigned len)
     {
         cursor += len;
-        if (len > size_)
+        if (cursor > size_)
         {
             throw StreamCompressorException("Attempt to write more than announced");
         }
@@ -108,18 +109,15 @@ public:
         unsigned length = input.tellg();
         input.seekg(0, input.beg);
 
-        std::string header;
-        std::getline(input, header);
-        header.append("\n");
-        char *buffer = new char[length-header.size()];
-        input.read(buffer, length-header.size());
+        char *buffer = new char[length];
+        input.read(buffer, length);
         if (input.fail() && !input.eof())
         {
             throw StreamCompressorException("Error reading from input stream");
         }
-        if (cmpr.entry == nullptr || archive_entry_size(cmpr.entry) == 0)
+        if (archive_entry_size(cmpr.entry) == 0)
         {
-            cmpr.init_entry(length, header.c_str());
+            cmpr.init_entry(length);
         }
 
         cmpr.write(buffer, length);
