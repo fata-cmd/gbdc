@@ -101,6 +101,22 @@ double ScaledEntropy(std::vector<int> distribution) {
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
 
+double ScaledEntropy(std::vector<int> distribution) {
+    std::unordered_map<int64_t, int64_t> occurence;
+    for (unsigned value : distribution)
+    {
+        if (occurence.count(value))
+        {
+            occurence[value] = occurence[value] + 1;
+        }
+        else
+        {
+            occurence[value] = 1;
+        }
+    }
+    return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
+}
+
 double ScaledEntropy(std::vector<uint64_t> distribution)
 {
     std::unordered_map<int64_t, int64_t> occurence;
@@ -154,7 +170,8 @@ void push_distribution(std::vector<double> &record, std::vector<T> distribution)
     record.insert(record.end(), { mean, variance, min, max, entropy });
 }
 
-inline size_t numDigits(unsigned x){
+inline size_t numDigits(unsigned x)
+{
     return ceil(log10(x));
 }
 
