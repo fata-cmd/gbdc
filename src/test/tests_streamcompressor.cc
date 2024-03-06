@@ -68,7 +68,7 @@ int main()
     std::cerr << std::filesystem::current_path() << "\n";
     const char *tmp_arch = "resources/test123.cnf.xz";
     // const char *cnf_file = "src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf";
-    const char *cnf_file = "resources/test.cnf";
+    const char *cnf_file = "resources/test.cnf.xz";
     StreamBuffer cnf_buf(cnf_file);
 
     const char *data = "\np cnf 1 2\n1 2 0\n1 0\n-2 3 0";
