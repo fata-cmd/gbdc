@@ -47,20 +47,23 @@ public:
     StreamCompressor(const char *output, unsigned size = 0) : size_(size), cursor(0), status(0)
     {
         a = archive_write_new();
-        archive_write_set_format_pax_restricted(a);
+        status = archive_write_set_format_raw(a);
+        if (status != ARCHIVE_OK)
+            throw StreamCompressorException("Error setting format: " + std::string(archive_error_string(a)));
         status = archive_write_add_filter_xz(a);
         if (status != ARCHIVE_OK)
-            throw StreamCompressorException("Error adding XZ filter");
+            throw StreamCompressorException("Error adding XZ filter: " + std::string(archive_error_string(a)));
         status = archive_write_open_filename(a, output);
         if (status != ARCHIVE_OK)
-            throw StreamCompressorException("Error open archive");
+            throw StreamCompressorException("Error open archive: " + std::string(archive_error_string(a)));
 
         entry = archive_entry_new();
 
         std::filesystem::path p(output);
         auto entry_path = p.filename();
         std::cerr << entry_path.extension() << "\n";
-        if (entry_path.extension() == ".xz"){
+        if (entry_path.extension() == ".xz")
+        {
             entry_path.replace_extension();
         }
         std::cerr << entry_path << "\n";
@@ -99,7 +102,7 @@ public:
         if (bytes_written != len)
         {
             std::cerr << archive_error_string << "\n";
-            throw StreamCompressorException("Error writing to archive");
+            throw StreamCompressorException("Error writing to archive: " + std::string(archive_error_string(a)));
         }
     }
 
@@ -132,12 +135,12 @@ public:
         status = archive_write_close(a);
         if (status != ARCHIVE_OK)
         {
-            throw StreamCompressorException("Error closing archive");
+            throw StreamCompressorException("Error closing archive: " + std::string(archive_error_string(a)));
         }
         status = archive_write_free(a);
         if (status != ARCHIVE_OK)
         {
-            throw StreamCompressorException("Error freeing archive");
+            throw StreamCompressorException("Error freeing archive: " + std::string(archive_error_string(a)));
         }
     }
 };

@@ -41,6 +41,7 @@ key
 key.pub
 benchmarks/
 test.db
+build.sh
 
 # autotools output
 configure
