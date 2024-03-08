@@ -1,5 +1,5 @@
 /*************************************************************************************************
-CNFTools -- Copyright (c) 2021, Markus Iser, KIT - Karlsruhe Institute of Technology
+CNFTools -- Copyright (c) 2021, Markus Iser, Fahri Taban, KIT - Karlsruhe Institute of Technology
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -31,6 +31,7 @@ class StreamCompressorException : public std::runtime_error
 public:
     StreamCompressorException() : std::runtime_error("Stream Compressor Exception") {}
     explicit StreamCompressorException(const std::string &msg) : std::runtime_error(msg) {}
+    explicit StreamCompressorException(const std::string &msg, archive *arch) : std::runtime_error(msg + ": " + std::string(archive_error_string(arch))) {}
 };
 
 class StreamCompressor
@@ -38,7 +39,7 @@ class StreamCompressor
     unsigned size_;
     unsigned cursor;
 
-    struct archive *a;
+    struct archive *arch;
     struct archive_entry *entry;
 
     int status;
@@ -46,49 +47,39 @@ class StreamCompressor
 public:
     StreamCompressor(const char *output, unsigned size = 0) : size_(size), cursor(0), status(0)
     {
-        a = archive_write_new();
-        status = archive_write_set_format_raw(a);
+        arch = archive_write_new();
+        status = archive_write_set_format_raw(arch);
         if (status != ARCHIVE_OK)
-            throw StreamCompressorException("Error setting format: " + std::string(archive_error_string(a)));
-        status = archive_write_add_filter_xz(a);
+            throw StreamCompressorException("Error setting format", arch);
+        status = archive_write_add_filter_xz(arch);
         if (status != ARCHIVE_OK)
-            throw StreamCompressorException("Error adding XZ filter: " + std::string(archive_error_string(a)));
-        status = archive_write_open_filename(a, output);
+            throw StreamCompressorException("Error adding XZ filter", arch);
+        status = archive_write_open_filename(arch, output);
         if (status != ARCHIVE_OK)
-            throw StreamCompressorException("Error open archive: " + std::string(archive_error_string(a)));
+            throw StreamCompressorException("Error open archive", arch);
 
         entry = archive_entry_new();
 
         std::filesystem::path p(output);
         auto entry_path = p.filename();
-        std::cerr << entry_path.extension() << "\n";
         if (entry_path.extension() == ".xz")
         {
             entry_path.replace_extension();
         }
-        std::cerr << entry_path << "\n";
+
         archive_entry_set_pathname(entry, entry_path.c_str());
-        if (size_ != 0)
-            init_entry(size);
+        if (size != 0)
+            resize_entry(size);
+        archive_entry_set_filetype(entry, AE_IFREG);
+        archive_entry_set_perm(entry, 0644);
+
+        status = archive_write_header(arch, entry);
+        if (status != ARCHIVE_OK)
+            throw StreamCompressorException("Error writing header", arch);
     }
 
     ~StreamCompressor()
     {
-    }
-
-    void init_entry(unsigned size)
-    {
-        size_ = size;
-        archive_entry_set_size(entry, size);
-        archive_entry_set_filetype(entry, AE_IFREG);
-        archive_entry_set_perm(entry, 0644);
-
-        status = archive_write_header(a, entry);
-        if (status != ARCHIVE_OK)
-        {
-            std::cerr << archive_error_string(a);
-            throw StreamCompressorException("Error writing header");
-        }
     }
 
     void write(const char *buf, unsigned len)
@@ -98,12 +89,19 @@ public:
         {
             throw StreamCompressorException("Attempt to write more than announced");
         }
-        int bytes_written = archive_write_data(a, buf, len);
+    
+        int bytes_written = archive_write_data(arch, buf, len);
         if (bytes_written != len)
         {
             std::cerr << archive_error_string << "\n";
-            throw StreamCompressorException("Error writing to archive: " + std::string(archive_error_string(a)));
+            throw StreamCompressorException("Error writing to archive", arch);
         }
+    }
+
+    void resize_entry(size_t size)
+    {
+        size_ = size;
+        archive_entry_set_size(entry, size);
     }
 
     friend std::istream &operator>>(std::istream &input, StreamCompressor &cmpr)
@@ -118,9 +116,9 @@ public:
         {
             throw StreamCompressorException("Error reading from input stream");
         }
-        if (archive_entry_size(cmpr.entry) == 0)
+        if (archive_entry_size(cmpr.entry) < length)
         {
-            cmpr.init_entry(length);
+            cmpr.resize_entry(length);
         }
 
         cmpr.write(buffer, length);
@@ -132,15 +130,15 @@ public:
     void close()
     {
         archive_entry_free(entry);
-        status = archive_write_close(a);
+        status = archive_write_close(arch);
         if (status != ARCHIVE_OK)
         {
-            throw StreamCompressorException("Error closing archive: " + std::string(archive_error_string(a)));
+            throw StreamCompressorException("Error closing archive", arch);
         }
-        status = archive_write_free(a);
+        status = archive_write_free(arch);
         if (status != ARCHIVE_OK)
         {
-            throw StreamCompressorException("Error freeing archive: " + std::string(archive_error_string(a)));
+            throw StreamCompressorException("Error freeing archive", arch);
         }
     }
 };
