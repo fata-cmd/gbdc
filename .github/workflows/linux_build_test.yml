@@ -61,7 +61,7 @@ jobs:
       working-directory: ${{ github.workspace }}
       run: |
         PYPI_VERSION=$(echo ${{ github.ref_name }} | sed 's/[a-zA-Z]*//g')
-        sed -i'' "s/version=\"[^\"]*\"/version=\"$PYPI_VERSION\"/" setup.py
+        sed -i "s/version=\"[^\"]*\"/version=\"$PYPI_VERSION\"/" setup.py
       if: startsWith(github.ref_name, 'v')
 
       # Build wheels using a docker image and different versions of python
