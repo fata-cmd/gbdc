@@ -71,8 +71,8 @@ jobs:
       run: |
         pip install twine
         export TWINE_USERNAME="__token__"
-        export TWINE_PASSWORD="${{ secrets.TEST_PYPI_API_TOKEN }}"
-        twine upload --skip-existing --repository-url https://test.pypi.org/legacy/ wheelhouse/* --verbose
+        export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
+        twine upload --skip-existing --repository-url https://upload.pypi.org/legacy/ wheelhouse/* --verbose
       if: startsWith(github.ref_name, 'v')
    
     
