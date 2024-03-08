@@ -3,6 +3,7 @@ name: Linux Build-Test
 on:
   push:
     branches: [ master ]
+  release:
 
 jobs:
         
@@ -61,7 +62,7 @@ jobs:
         export DOCKER_IMAGE=quay.io/pypa/manylinux_2_28_x86_64
         docker pull $DOCKER_IMAGE
         docker run --rm -v ${{ github.workspace }}:/io $DOCKER_IMAGE /io/build-wheels.sh
-      if: startsWith(github.ref, 'refs/tags/')
+      if: github.event_name == 'release'
 
       
 
@@ -72,7 +73,7 @@ jobs:
         export TWINE_USERNAME="__token__"
         export TWINE_PASSWORD="${{ secrets.TEST_PYPI_API_TOKEN }}"
         twine upload --skip-existing --repository-url https://test.pypi.org/legacy/ wheelhouse/* --verbose
-      if: startsWith(github.ref, 'refs/tags/')
+      if: github.event_name == 'release'
    
     
         
