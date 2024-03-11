@@ -48,7 +48,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     message("Directories in ${LIBARCHIVE_PREFIX}: ${LIBARCHIVE_DIRS}")
     
     set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
-else
+else()
     find_package(LibArchive REQUIRED)
     if(LibArchive_FOUND)
         message(STATUS "LibArchive found:")
