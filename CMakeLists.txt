@@ -47,6 +47,13 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 endif()
 
 find_package(LibArchive REQUIRED)
+if(LibArchive_FOUND)
+    message(STATUS "LibArchive found:")
+    message(STATUS "Include Directories: ${LibArchive_INCLUDE_DIRS}")
+    message(STATUS "Libraries: ${LibArchive_LIBRARIES}")
+else()
+    message(FATAL_ERROR "LibArchive not found. Please install it.")
+endif()
 include_directories(${LibArchive_INCLUDE_DIRS})
 set(LIBS ${LIBS} md5 ${LibArchive_LIBRARIES})
 
