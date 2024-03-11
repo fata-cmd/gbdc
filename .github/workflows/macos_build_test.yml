@@ -58,8 +58,6 @@ jobs:
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       run: |
         ctest --build-config ${{ matrix.build_type }}
-        echo $LDFLAGS
-        echo $CPPFLAGS
       
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -76,8 +74,9 @@ jobs:
           # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
         fail-fast: true
     
+        # '3.8','3.9','3.10' do not build architecture-universal wheels
         matrix:
-          python_version: ['3.8','3.9','3.10','3.11','3.12']
+          python_version: ['3.11','3.12']
           
     steps:
       - uses: actions/checkout@v4
@@ -108,7 +107,7 @@ jobs:
           brew install libarchive
           # export LDFLAGS="-L/usr/local/opt/libarchive/lib"
           export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"          
-          python3 setup.py bdist_wheel
+          python3 setup.py bdist_wheel -v
 
 
       - name: Publish package to PyPI
