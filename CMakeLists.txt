@@ -43,7 +43,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     )
     message("Libarchive prefix: ${LIBARCHIVE_PREFIX}")
     set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
 endif()
 
 find_package(LibArchive REQUIRED)
