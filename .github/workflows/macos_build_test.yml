@@ -3,7 +3,7 @@ name: macOS Build-Test
 on:
   push:
     branches: [ master ]
-    tags: "v(.[0-9]+)+"
+    tags: 'v*.*.*'
 
 jobs:
         
@@ -104,8 +104,10 @@ jobs:
           pip install wheel
           pip install -U pip setuptools 
           brew install libarchive
-          export LDFLAGS="-L/usr/local/opt/libarchive/lib"
-          export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11 -mmacosx-version-min=11.7"
+          # echo $LDFLAGS
+          # echo $CPPFLAGS
+          # export LDFLAGS="$LDFLAGS -L/usr/local/opt/libarchive/lib"
+          # export CPPFLAGS="$CPPFLAGS -I/usr/local/opt/libarchive/include -std=c++11 -mmacosx-version-min=11.7"          
           python3 setup.py bdist_wheel
 
 
