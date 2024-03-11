@@ -44,7 +44,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     message("Libarchive prefix: ${LIBARCHIVE_PREFIX}")
     set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
     list(INSERT CMAKE_PREFIX_PATH 0 "${LIBARCHIVE_PREFIX}")
-    
+
     set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
 endif()
 find_package(LibArchive REQUIRED)
@@ -58,6 +58,7 @@ endif()
 
 include_directories(${LibArchive_INCLUDE_DIRS})
 set(LIBS ${LIBS} md5 ${LibArchive_LIBRARIES})
+message(STATUS "Added libs: ${LIBS}")
 
 include_directories(gbdc PUBLIC "${PROJECT_SOURCE_DIR}")
 

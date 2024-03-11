@@ -108,7 +108,7 @@ jobs:
           pip install -U pip setuptools 
           brew install libarchive
           export LDFLAGS="-L/usr/local/opt/libarchive/lib"
-          export CPPFLAGS="-I/usr/local/opt/libarchive/include -L/usr/local/opt/libarchive/lib -std=c++11"          
+          export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"          
           python3 setup.py bdist_wheel -v
 
 
