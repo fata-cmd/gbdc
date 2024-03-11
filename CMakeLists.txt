@@ -46,6 +46,8 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     # List directories within LIBARCHIVE_PREFIX
     file(GLOB LIBARCHIVE_DIRS LIST_DIRECTORIES true "${LIBARCHIVE_PREFIX}/*")
     message("Directories in ${LIBARCHIVE_PREFIX}: ${LIBARCHIVE_DIRS}")
+    file(GLOB LIBARCHIVE_LIB LIST_DIRECTORIES true "${LIBARCHIVE_PREFIX}/lib")
+    message("Directories in ${LIBARCHIVE_PREFIX}/lib: ${LIBARCHIVE_LIB}")
     
     set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
 else()
