@@ -41,7 +41,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         OUTPUT_STRIP_TRAILING_WHITESPACE
         COMMAND_ERROR_IS_FATAL ANY
     )
+    message("Libarchive prefix: ${LIBARCHIVE_PREFIX}")
     set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 endif()
 
 find_package(LibArchive REQUIRED)
