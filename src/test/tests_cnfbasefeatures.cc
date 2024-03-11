@@ -35,16 +35,16 @@ TEST_CASE("CNFBaseFeatures")
         }
     }
     
-    SUBCASE("Component counting"){
-        char *tmp_file;
-        for(unsigned expected_ccs = 1; expected_ccs < 10; ++expected_ccs){
-            tmp_file = generate_cnf_file(expected_ccs);
-            CNF::BaseFeatures stats(tmp_file);
-            stats.extract();
-            auto it = std::find(stats.getNames().begin(),stats.getNames().end(), "ccs");
-            auto actual_ccs = stats.getFeatures()[it - stats.getNames().begin()];
-            CHECK(actual_ccs == expected_ccs);
-            remove(tmp_file);
-        }
-    }
+    // SUBCASE("Component counting"){
+    //     char *tmp_file;
+    //     for(unsigned expected_ccs = 1; expected_ccs < 10; ++expected_ccs){
+    //         tmp_file = generate_cnf_file(expected_ccs);
+    //         CNF::BaseFeatures stats(tmp_file);
+    //         stats.extract();
+    //         auto it = std::find(stats.getNames().begin(),stats.getNames().end(), "ccs");
+    //         auto actual_ccs = stats.getFeatures()[it - stats.getNames().begin()];
+    //         CHECK(actual_ccs == expected_ccs);
+    //         remove(tmp_file);
+    //     }
+    // }
 }

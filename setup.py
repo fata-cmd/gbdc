@@ -19,6 +19,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 from setuptools import setup, Extension
 import os
+import platform
+
 
 module = Extension("gbdc",
                    libraries=["archive", "cadical"],

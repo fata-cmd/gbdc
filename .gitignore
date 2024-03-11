@@ -40,7 +40,7 @@ build-artifacts*.zip
 key
 key.pub
 benchmarks/
-test.db
+test.sh
 build.sh
 Testing/
 

@@ -3,7 +3,7 @@ name: Linux Build-Test
 on:
   push:
     branches: [ master ]
-    tags: "v(.[0-9]+)+"
+    tags: 'v*.*.*'
 
 jobs:
         
@@ -49,6 +49,12 @@ jobs:
 
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifact
+        path: ${{ steps.strings.outputs.build-output-dir }}
 
     - name: Run tests
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
