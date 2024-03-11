@@ -3,7 +3,7 @@ name: macOS Build-Test
 on:
   push:
     branches: [ master ]
-    tags: "v*"
+    tags: "v(.[0-9]+)+"
 
 jobs:
         
@@ -31,7 +31,6 @@ jobs:
 
     - name: Install libarchive
       run:   |
-         echo ${{ github.ref }}
          brew install libarchive
       shell: bash
 
@@ -73,7 +72,7 @@ jobs:
     if: startsWith(github.ref_name, 'v')  
     strategy:
           # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
-        fail-fast: false
+        fail-fast: true
     
         matrix:
           python_version: ['3.8','3.9','3.10','3.11','3.12']
