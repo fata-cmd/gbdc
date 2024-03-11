@@ -34,15 +34,15 @@ add_library(solver STATIC IMPORTED)
 add_dependencies(solver cadical_external)
 set_target_properties(solver PROPERTIES IMPORTED_LOCATION "${CADICAL_LIB}")
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    execute_process(
-        COMMAND brew --prefix libarchive
-        OUTPUT_VARIABLE LIBARCHIVE_PREFIX
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        COMMAND_ERROR_IS_FATAL ANY
-    )
-    set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
-endif()
+# if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+#     execute_process(
+#         COMMAND brew --prefix libarchive
+#         OUTPUT_VARIABLE LIBARCHIVE_PREFIX
+#         OUTPUT_STRIP_TRAILING_WHITESPACE
+#         COMMAND_ERROR_IS_FATAL ANY
+#     )
+#     set(LibArchive_INCLUDE_DIR "${LIBARCHIVE_PREFIX}/include")
+# endif()
 
 find_package(LibArchive REQUIRED)
 include_directories(${LibArchive_INCLUDE_DIRS})
