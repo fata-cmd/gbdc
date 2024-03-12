@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
 
       matrix:
-        os: [macos-13,macos-14]
+        os: [macos-14]
         build_type: [Release]
         c_compiler: [clang]
         cpp_compiler: [clang++]
@@ -80,15 +80,12 @@ jobs:
     
         # '3.8','3.9','3.10' do not build architecture-universal wheels
         matrix:
-          os: [ 'macos-13', 'macos-14' ]
+          os: [ 'macos-14' ]
           python_version: ['3.11','3.12']
           include:
             - os: macos-14
               ldflags: -L/opt/homebrew/opt/libarchive/lib
               cppflags: -I/opt/homebrew/opt/libarchive/include
-            - os: macos-13
-              ldflags: -L/usr/local/opt/libarchive/lib
-              cppflags: -I/usr/local/opt/libarchive/include
           
     steps:
       - uses: actions/checkout@v4
