@@ -32,6 +32,7 @@ jobs:
     - name: Install libarchive
       run:   |
          brew install libarchive
+         ls /usr/local/opt/libarchive/lib/
       shell: bash
 
     - name: Set reusable strings
