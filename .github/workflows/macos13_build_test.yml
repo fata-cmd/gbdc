@@ -130,3 +130,22 @@ jobs:
           export TWINE_USERNAME="__token__"
           export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
           twine upload --skip-existing --repository-url https://upload.pypi.org/legacy/ dist/* --verbose
+
+        
+      - name: Test Package
+        shell: bash
+        run: |
+            brew install wget
+            mkdir gbd_test
+            cd gbd_test
+            
+            mkdir benchmarks
+            echo "http://benchmark-database.de/file/00063d88244921d6ec46aeab6866a8e2" > inst.uri
+            wget --content-disposition -i inst.uri -P benchmarks
+            
+            pip install gbd-tools==4.7.8 gbdc
+            
+            export GBD_DB=my.db
+            gbd init -j4 local benchmarks
+            gbd init -j4 base
+            gbd get -r ccs
