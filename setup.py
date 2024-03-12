@@ -19,12 +19,15 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 from setuptools import setup, Extension
 import os
+import platform
+
 
 module = Extension("gbdc",
                    libraries=["archive", "cadical"],
                    library_dirs=["lib", os.path.abspath("./build/solvers/src/cadical_external/build")],
                    include_dirs=["."],
-                   sources=["src/gbdlib.cc", "./lib/md5/md5.cpp"])
+                   sources=["src/gbdlib.cc", "./lib/md5/md5.cpp"],
+                   extra_compile_args=[ "-arch", platform.machine()])
 
 setup(name="gbdc",
       version="0.0",
