@@ -76,12 +76,13 @@ jobs:
     if: startsWith(github.ref_name, 'v')  
     strategy:
           # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
-        fail-fast: true
+        fail-fast: false
     
         # '3.8','3.9','3.10' do not build architecture-universal wheels
         matrix:
           os: [ 'macos-14' ]
-          python_version: ['3.11','3.12']
+          # python_version: ['3.11','3.12']
+          python_version: ['3.7', '3.8', '3.9', '3.10']
           include:
             - os: macos-14
               ldflags: -L/opt/homebrew/opt/libarchive/lib
