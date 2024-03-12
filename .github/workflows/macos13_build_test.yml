@@ -146,6 +146,6 @@ jobs:
             pip install gbd-tools==4.7.8 gbdc
             
             export GBD_DB=my.db
-            gbd init -j4 local benchmarks
+            yes | gbd init -j4 local benchmarks
             gbd init -j4 base
             gbd get -r ccs
