@@ -26,8 +26,7 @@ module = Extension("gbdc",
                    libraries=["archive", "cadical"],
                    library_dirs=["lib", os.path.abspath("./build/solvers/src/cadical_external/build")],
                    include_dirs=["."],
-                   sources=["src/gbdlib.cc", "./lib/md5/md5.cpp"],
-                   extra_compile_args=[ "-arch", platform.machine()])
+                   sources=["src/gbdlib.cc", "./lib/md5/md5.cpp"])
 
 setup(name="gbdc",
       version="0.0",
