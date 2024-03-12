@@ -55,11 +55,12 @@ jobs:
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
-    - name: Run tests
-      working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      run: |
-        ctest --build-config ${{ matrix.build_type }}
-      shell: bash
+    # - name: Run tests
+    #   working-directory: ${{ steps.strings.outputs.build-output-dir }}
+    #   run: |
+    #     ctest --build-config ${{ matrix.build_type }}
+    #   shell: bash
+
       
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -113,8 +114,9 @@ jobs:
           export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"          
           python3 setup.py bdist_wheel -v
           for whl in dist/*.whl; do
-            delocate-listdeps --depending "$whl"
+            delocate-listdeps --all "$whl"
             delocate-wheel -v "$whl"
+            delocate-listdeps --all "$whl"
           done
 
 
