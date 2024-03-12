@@ -21,13 +21,7 @@ jobs:
         build_type: [Release]
         c_compiler: [clang]
         cpp_compiler: [clang++]
-        include:
-          - os: macos-14
-            ldflags: -L/opt/homebrew/opt/libarchive/lib
-            cppflags: -I/opt/homebrew/opt/libarchive/include
-          - os: macos-13
-            ldflags: -L/usr/local/opt/libarchive/lib
-            cppflags: -I/usr/local/opt/libarchive/include
+
 
     steps:
     - uses: actions/checkout@v4
@@ -88,7 +82,13 @@ jobs:
         matrix:
           os: [ 'macos-13', 'macos-14' ]
           python_version: ['3.11','3.12']
-        
+          include:
+            - os: macos-14
+              ldflags: -L/opt/homebrew/opt/libarchive/lib
+              cppflags: -I/opt/homebrew/opt/libarchive/include
+            - os: macos-13
+              ldflags: -L/usr/local/opt/libarchive/lib
+              cppflags: -I/usr/local/opt/libarchive/include
           
     steps:
       - uses: actions/checkout@v4
@@ -119,8 +119,8 @@ jobs:
           pip install -U pip setuptools 
           pip install delocate
           brew install libarchive
-          export LDFLAGS="-L/usr/local/opt/libarchive/lib"
-          export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"          
+          export LDFLAGS="${{ matrix.ldflags }}"
+          export CPPFLAGS="${{ matrix.cppflags }} -std=c++11"          
           python3 setup.py bdist_wheel -v
           for whl in dist/*.whl; do
             delocate-listdeps --all "$whl"
