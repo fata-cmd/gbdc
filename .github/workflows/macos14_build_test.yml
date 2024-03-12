@@ -107,8 +107,8 @@ jobs:
           PYPI_VERSION=$(echo ${{ github.ref_name }} | sed 's/[a-zA-Z]*//g')
           sed -i "" "s/version=\"[^\"]*\"/version=\"$PYPI_VERSION\"/" setup.py
         shell: bash
-      
-      - name: Python Build
+
+      - name: Install dependencies
         working-directory: ${{ github.workspace }}
         shell: bash
         run: |
@@ -117,8 +117,13 @@ jobs:
           pip install delocate
           brew install libarchive
           export LDFLAGS="${{ matrix.ldflags }}"
-          export CPPFLAGS="${{ matrix.cppflags }} -std=c++11"          
-          python3 setup.py bdist_wheel -v
+          export CPPFLAGS="${{ matrix.cppflags }} -std=c++11"     
+
+      - name: Python Build
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |     
+          arch -arm64 python3 setup.py bdist_wheel -v
           for whl in dist/*.whl; do
             delocate-listdeps --all "$whl"
             delocate-wheel -v "$whl"
