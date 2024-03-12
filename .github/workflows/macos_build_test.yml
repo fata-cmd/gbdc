@@ -113,6 +113,7 @@ jobs:
           export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"          
           python3 setup.py bdist_wheel -v
           for whl in dist/*.whl; do
+            delocate-listdeps --depending "$whl"
             delocate-wheel -v "$whl"
           done
 
