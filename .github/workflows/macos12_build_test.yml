@@ -105,7 +105,7 @@ jobs:
           sed -i "" "s/version=\"[^\"]*\"/version=\"$PYPI_VERSION\"/" setup.py
         shell: bash
       
-      - name: Python Build
+      - name: Install dependencies
         working-directory: ${{ github.workspace }}
         shell: bash
         run: |
@@ -113,6 +113,14 @@ jobs:
           pip install -U pip setuptools 
           pip install delocate
           brew install libarchive
+
+
+      - name: Python Build
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          export _PYTHON_HOST_PLATFORM="macosx-12.0-x86_64"
+          export ARCHFLAGS="-arch x86_64"
           export LDFLAGS="${{ matrix.ldflags }}"
           export CPPFLAGS="${{ matrix.cppflags }} -std=c++11"          
           python3 setup.py bdist_wheel -v
