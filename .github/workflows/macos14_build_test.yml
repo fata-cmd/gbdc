@@ -123,7 +123,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         shell: bash
         run: |     
-          arch -arm64 python3 setup.py bdist_wheel -v
+          arch -arm64 python3 setup.py bdist_wheel --plat-name=macosx-14.0-arm64
           for whl in dist/*.whl; do
             delocate-listdeps --all "$whl"
             delocate-wheel -v "$whl"
