@@ -80,7 +80,7 @@ jobs:
     
         # '3.8','3.9','3.10' do not build architecture-universal wheels
         matrix:
-          python_version: [ '3.11','3.12']
+          python_version: [ '3.8','3.9','3.10', '3.11','3.12']
           ldflags: [ -L/usr/local/opt/libarchive/lib ]
           cppflags: [ -I/usr/local/opt/libarchive/include ]
           
