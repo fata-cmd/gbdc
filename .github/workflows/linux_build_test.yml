@@ -4,7 +4,6 @@ on:
   push:
     branches: [ master ]
     tags: 'v*.*.*'
-    tags: 'v*.*.*'
 
 jobs:
         
@@ -88,20 +87,13 @@ jobs:
         docker run --rm -v ${{ github.workspace }}:/io $DOCKER_IMAGE /io/build-wheels.sh
       # Trigger only for releases
       if: startsWith(github.ref_name, 'v')
-      # Trigger only for releases
-      if: startsWith(github.ref_name, 'v')
 
       
-    - name: Publish package to PyPI
     - name: Publish package to PyPI
       shell: bash
       run: |
         pip install twine
         export TWINE_USERNAME="__token__"
-        export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
-        twine upload --skip-existing --repository-url https://upload.pypi.org/legacy/ wheelhouse/* --verbose
-      # Trigger only for releases
-      if: startsWith(github.ref_name, 'v')
         export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
         twine upload --skip-existing --repository-url https://upload.pypi.org/legacy/ wheelhouse/* --verbose
       # Trigger only for releases
