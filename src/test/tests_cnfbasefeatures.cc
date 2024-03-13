@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <string>
 
-#include "src/test/Util.h"
 #include "src/extract/CNFBaseFeatures.h"
 #include "src/test/Util.h"
 
