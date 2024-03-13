@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <random>
+#include "src/util/SolverTypes.h"
 
 std::unordered_map<std::string, double> record_to_map(std::string record_file_name)
 {

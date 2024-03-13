@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <filesystem>
 #include <string>
+#include <cstring>
 
 #include "src/test/Util.h"
 #include "src/extract/CNFBaseFeatures.h"
