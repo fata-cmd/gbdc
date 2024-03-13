@@ -2,7 +2,7 @@ name: macOS-12 Build-Test
 
 on:
   push:
-    # branches: [ master ]
+    branches: [ master ]
     tags: 'v*.*.*'
 
 jobs:
@@ -56,11 +56,11 @@ jobs:
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
-    # - name: Run tests
-    #   working-directory: ${{ steps.strings.outputs.build-output-dir }}
-    #   run: |
-    #     ctest --build-config ${{ matrix.build_type }}
-    #   shell: bash
+    - name: Run tests
+      working-directory: ${{ steps.strings.outputs.build-output-dir }}
+      run: |
+        ctest --build-config ${{ matrix.build_type }}
+      shell: bash
 
       
     - name: Upload build artifacts
@@ -81,8 +81,8 @@ jobs:
         # '3.8','3.9','3.10' do not build architecture-universal wheels
         matrix:
           python_version: [ '3.8','3.9','3.10', '3.11','3.12']
-          ldflags: [ -L/usr/local/opt/libarchive/lib ]
-          cppflags: [ -I/usr/local/opt/libarchive/include ]
+          archive_lib: [ -L/usr/local/opt/libarchive/lib ]
+          archive_include: [ -I/usr/local/opt/libarchive/include ]
           
     steps:
       - uses: actions/checkout@v4
@@ -121,8 +121,8 @@ jobs:
         run: |
           export _PYTHON_HOST_PLATFORM="macosx-12.0-x86_64"
           export ARCHFLAGS="-arch x86_64"
-          export LDFLAGS="${{ matrix.ldflags }}"
-          export CPPFLAGS="${{ matrix.cppflags }} -std=c++11"          
+          export LDFLAGS="${{ matrix.archive_lib }}"
+          export CPPFLAGS="${{ matrix.archive_include }} -std=c++11"          
           python3 setup.py bdist_wheel -v
           for whl in dist/*.whl; do
             delocate-listdeps --all "$whl"

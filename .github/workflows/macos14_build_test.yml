@@ -2,7 +2,7 @@ name: macOS-14 Build-Test
 
 on:
   push:
-    # branches: [ master ]
+    branches: [ master ]
     tags: 'v*.*.*'
 
 jobs:
@@ -56,11 +56,11 @@ jobs:
     - name: Build
       run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
-    # - name: Run tests
-    #   working-directory: ${{ steps.strings.outputs.build-output-dir }}
-    #   run: |
-    #     ctest --build-config ${{ matrix.build_type }}
-    #   shell: bash
+    - name: Run tests
+      working-directory: ${{ steps.strings.outputs.build-output-dir }}
+      run: |
+        ctest --build-config ${{ matrix.build_type }}
+      shell: bash
 
       
     - name: Upload build artifacts
@@ -81,10 +81,8 @@ jobs:
         matrix:
           os: [ macos-14 ]
           python_version: ['3.10','3.11','3.12']
-          include:
-            - os: macos-14
-              ldflags: -L/opt/homebrew/opt/libarchive/lib
-              cppflags: -I/opt/homebrew/opt/libarchive/include
+          archive_lib: [-L/opt/homebrew/opt/libarchive/lib]
+          archive_include: [-I/opt/homebrew/opt/libarchive/include]
           
     steps:
       - uses: actions/checkout@v4
@@ -120,8 +118,8 @@ jobs:
         working-directory: ${{ github.workspace }}
         shell: bash
         run: |
-          export LDFLAGS="${{ matrix.ldflags }}"
-          export CPPFLAGS="${{ matrix.cppflags }} -std=c++11"
+          export LDFLAGS="${{ matrix.archive_lib }}"
+          export CPPFLAGS="${{ matrix.archive_include }} -std=c++11"
           export _PYTHON_HOST_PLATFORM="macosx-14.0-arm64"
           export ARCHFLAGS="-arch arm64"
           python3 setup.py bdist_wheel
