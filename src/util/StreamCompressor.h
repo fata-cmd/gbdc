@@ -93,6 +93,7 @@ public:
         int bytes_written = archive_write_data(arch, buf, len);
         if (bytes_written != len)
         {
+            std::cerr << archive_error_string << "\n";
             throw StreamCompressorException("Error writing to archive", arch);
         }
     }

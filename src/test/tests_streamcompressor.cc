@@ -18,12 +18,9 @@ TEST_CASE("StreamCompressor")
         const char *data = "p cnf 1 2\n1 2 0\n1 0\n-2 3 0";
         c.write(data, strlen(data));
         c.close();
-        Cl cl1, cl2, cl3;
-        cl1.push_back(Lit(1, false));
-        cl1.push_back(Lit(2, false));
-        cl2.push_back(Lit(1, false));
-        cl3.push_back(Lit(2, true));
-        cl3.push_back(Lit(3, false));
+        Cl cl1 = {Lit(1, false), Lit(2, false)};
+        Cl cl2 = {Lit(1, false)};
+        Cl cl3 = {Lit(2, true), Lit(3, false)};
         std::vector<Cl> clauses{cl1, cl2, cl3};
         StreamBuffer b(tmp_file);
         Cl clause;
@@ -40,8 +37,7 @@ TEST_CASE("StreamCompressor")
     SUBCASE("Write from istream to archive")
     {
         const char *tmp_file = strcat(tmpnam(nullptr), ".cnf.xz");
-        const char *cnf_file = "src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf";
-        // const char *cnf_file = "src/test/resources/test.cnf";
+        const char *cnf_file = "src/test/resources/ibm-2004-03-k70.cnf";
         StreamBuffer cnf_buf(cnf_file);
 
         StreamCompressor cmpr(tmp_file);
