@@ -56,12 +56,6 @@ jobs:
         name: build-artifact
         path: ${{ steps.strings.outputs.build-output-dir }}
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifact
-        path: ${{ steps.strings.outputs.build-output-dir }}
-
     - name: Run tests
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       run: ctest --build-config ${{ matrix.build_type }}
