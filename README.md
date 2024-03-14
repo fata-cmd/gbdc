@@ -17,14 +17,14 @@ A description of the supported domains, feature extractors, and instance transfo
 
 ## Installation
 
-GBDC relies on `libarchive` for reading from a wide array of compressed formats, typically provided by the `libarchive-dev` package in most systems. Additionally, certain GBDC functions utilize an [IPASIR](https://github.com/biotomas/ipasir) SAT Solver. GBDC's build system automatically fetches the external SAT Solver [CaDiCaL](http://fmv.jku.at/cadical/) by A. Biere, which is licensed under MIT.
+GBDC relies on `libarchive` for reading from a wide array of compressed formats, typically provided by the `libarchive-dev` package in most systems. Additionally, certain GBDC functions utilize an [IPASIR](https://github.com/biotomas/ipasir) SAT Solver. GBDC's build system also automatically fetches the external SAT Solver [CaDiCaL](http://fmv.jku.at/cadical/) by A. Biere, which is licensed under MIT.
 
 ### Steps:
 1. **Install Libarchive**
    - For Ubuntu: `apt install libarchive-dev`
    - For macOS: `brew install libarchive`
 
-2. Run the installation script `install-pymod.sh` inside the directory containing the CMakeLists.txt.
+2. Inside the directory containing the CMakeLists.txt Run the installation script `install-pymod.sh`.
 
 ### Experimental:
 The PyPI package `gbdc` contains pre-built distributions that can be installed via `pip install gbdc`. However, please note that some platform-specific distributions may be missing, and the existing ones have not undergone extensive testing yet.
