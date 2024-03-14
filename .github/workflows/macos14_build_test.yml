@@ -119,7 +119,8 @@ jobs:
         shell: bash
         run: |
           export LDFLAGS="${{ matrix.archive_lib }}"
-          export CPPFLAGS="${{ matrix.archive_include }} -std=c++11 -mmacosx-version-min=10.9"
+          export CPPFLAGS="${{ matrix.archive_include }} -std=c++11 -mmacos-version-min=10.9"
+          export CFLAGS="-mmacos-version-min=10.9"
           export _PYTHON_HOST_PLATFORM="macosx-10.9-arm64"
           export ARCHFLAGS="-arch arm64"
           python3 setup.py bdist_wheel
