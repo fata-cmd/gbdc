@@ -119,10 +119,10 @@ jobs:
         working-directory: ${{ github.workspace }}
         shell: bash
         run: |
-          export _PYTHON_HOST_PLATFORM="macosx-12.0-x86_64"
+          export _PYTHON_HOST_PLATFORM="macosx-10.9-x86_64"
           export ARCHFLAGS="-arch x86_64"
           export LDFLAGS="${{ matrix.archive_lib }}"
-          export CPPFLAGS="${{ matrix.archive_include }} -std=c++11"          
+          export CPPFLAGS="${{ matrix.archive_include }} -std=c++11 -mmacos-version-min=10.9"          
           python3 setup.py bdist_wheel -v
           for whl in dist/*.whl; do
             delocate-listdeps --all "$whl"
