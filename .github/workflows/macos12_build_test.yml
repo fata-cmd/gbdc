@@ -54,7 +54,9 @@ jobs:
       shell: bash
 
     - name: Build
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      run: |
+        export MACOSX_DEPLOYMENT_TARGET=10.9
+        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
 
     - name: Run tests
       working-directory: ${{ steps.strings.outputs.build-output-dir }}

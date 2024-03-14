@@ -20,7 +20,7 @@ else()
         GIT_REPOSITORY git@github.com:arminbiere/cadical.git 
         GIT_TAG master
         PREFIX solvers
-        CONFIGURE_COMMAND ./configure "CXXFLAGS=-fPIC -mmacos-version-min=10.9 CFLAGS=-mmacos-version-min=10.9"
+        CONFIGURE_COMMAND ./configure "CXXFLAGS=-fPIC"
         BUILD_COMMAND make -j
         INSTALL_COMMAND ""
         BUILD_BYPRODUCTS "${CADICAL_LIB}"
