@@ -78,7 +78,6 @@ jobs:
           # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
         fail-fast: true
     
-        # '3.8','3.9','3.10' do not build architecture-universal wheels
         matrix:
           python_version: [ '3.8','3.9','3.10', '3.11','3.12']
           archive_lib: [ -L/usr/local/opt/libarchive/lib ]
