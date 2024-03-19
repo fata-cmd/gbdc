@@ -19,7 +19,6 @@ if [ "$(uname)" == "Darwin" ]; then
     sudo make install
     export LDFLAGS="-L/usr/local/lib" 
     export CPPFLAGS="-I/usr/local/include -std=c++11"
-    export CFLAGS="-I/usr/local/include -std=c++11"
 else
     make install
 fi
