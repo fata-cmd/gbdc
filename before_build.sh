@@ -5,9 +5,9 @@ if [ "$(uname)" == "Linux" ]; then
     cd /project
 fi
 
-if [ "$(uname)" == "Darwin" ]; then
-    brew install wget
-fi
+# if [ "$(uname)" == "Darwin" ]; then
+#     brew install wget
+# fi
 
 rm -rf gbd_test libarchive
 
@@ -15,13 +15,18 @@ git clone https://github.com/libarchive/libarchive.git
 cd libarchive
 cmake -DCMAKE_BUILD_TYPE=Release .
 make -j4
-sudo make install
-
+make install
 cd ..
-bash install-pymod.sh 4
 
-mkdir gbd_test
-cd gbd_test
+mkdir -p build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j4
+cd ..
+
+
+# mkdir gbd_test
+# cd gbd_test
 
 # mkdir benchmarks
 
@@ -33,5 +38,5 @@ cd gbd_test
 # gbd init -j4 base
 # gbd get -r ccs
 
-cd ..
-rm -rf gbd_test libarchive
+# cd ..
+# rm -rf gbd_test libarchive

@@ -48,8 +48,8 @@ jobs:
         CIBW_MUSLLINUX_AARCH64_IMAGE: musllinux_1_2
         CIBW_MUSLLINUX_PPC64LE_IMAGE: musllinux_1_2
         CIBW_MUSLLINUX_S390X_IMAGE: musllinux_1_2
-        # skip PyPi, 3.6, 3.7, 3.8-macos, 3.9-macos and 32-bit builds
-        CIBW_SKIP: pp* cp36-* cp37-* cp38-macosx* cp39-macosx* *-win32 *-manylinux_i686
+        # skip PyPy, 3.6 - 3.9 and 32-bit builds
+        CIBW_SKIP: pp* cp36-* cp37-* cp38* cp39* *-win32 *-manylinux_i686
         # cmake -B ${{ steps.strings.outputs.build-output-dir }}
         # -DCMAKE_BUILD_TYPE="Release"
         # -S ${{ github.workspace }}
