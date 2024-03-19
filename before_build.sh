@@ -15,13 +15,13 @@ git clone https://github.com/libarchive/libarchive.git
 cd libarchive
 cmake -DCMAKE_BUILD_TYPE=Release .
 make -j4
-make install
+sudo make install
 
 cd ..
 
 if [ "$(uname)" == "Darwin" ]; then
-    export LDFLAGS="-L/usr/local/lib" 
-    export CPPFLAGS="-I/usr/local/include -std=c++11"
+    export LDFLAGS="-L/usr/local/opt/lib" 
+    export CPPFLAGS="-I/usr/local/opt/include -std=c++11"
 fi
 
 mkdir -p build
