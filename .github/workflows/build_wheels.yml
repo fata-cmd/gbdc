@@ -34,7 +34,7 @@ jobs:
     - name: Build wheels
       uses: pypa/cibuildwheel@v2.17.0
       env:
-        MACOSX_DEPLOYMENT_TARGET: "10.14"
+        MACOSX_DEPLOYMENT_TARGET: "10.15"
         CIBW_BUILD_FRONTEND: build # python -m build --wheel
         CIBW_ARCHS_MACOS: auto
         CIBW_ARCHS_LINUX: auto aarch64 # ppc64le s390x
