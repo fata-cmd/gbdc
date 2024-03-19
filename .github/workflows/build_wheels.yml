@@ -1,4 +1,4 @@
-name: Linux Build-Test
+name: Build-Test
 
 on:
   push:
@@ -71,7 +71,7 @@ jobs:
         name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
         path: ./wheelhouse/*.whl
 
-  upload:
+  release:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref_name, 'v')  
@@ -100,7 +100,6 @@ jobs:
         export TWINE_PASSWORD="${{ secrets.PYPI_API_TOKEN }}"
         twine upload --skip-existing --repository-url https://upload.pypi.org/legacy/ wheelhouse/* --verbose
       # Trigger only for releases
-      if: startsWith(github.ref_name, 'v')
    
     
         

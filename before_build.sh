@@ -20,8 +20,8 @@ make install
 cd ..
 
 if [ "$(uname)" == "Darwin" ]; then
-    export LDFLAGS="-L/usr/local/libarchive/lib" 
-    export CPPFLAGS="-I/usr/local/libarchive/include -std=c++11"
+    export LDFLAGS="-L/usr/local/lib" 
+    export CPPFLAGS="-I/usr/local/include -std=c++11"
 fi
 
 mkdir -p build
