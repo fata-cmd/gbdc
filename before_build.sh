@@ -9,22 +9,23 @@ fi
 #     brew install wget
 # fi
 
-rm -rf gbd_test libarchive
+# rm -rf gbd_test libarchive
 
 git clone https://github.com/libarchive/libarchive.git
 cd libarchive
 cmake -DCMAKE_BUILD_TYPE=Release .
-make -j4
+make -j$(nproc)
 make install
 cd ..
 
-mkdir -p build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j4
+git clone https://github.com/arminbiere/cadical.git
+cd cadical
+cmake -DCMAKE_BUILD_TYPE=Release .
+make -j$(nproc)
+make install
 cd ..
 
-
+cmake -DCMAKE_BUILD_TYPE=Release .
 # mkdir gbd_test
 # cd gbd_test
 
