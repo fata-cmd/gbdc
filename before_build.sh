@@ -17,27 +17,13 @@ cmake -DCMAKE_BUILD_TYPE=Release .
 make -j4
 if [ "$(uname)" == "Darwin" ]; then
     sudo make install
-    macos_version=$(sw_vers -productVersion)
-
-    # Extract the major version number
-    major_version=$(echo "$macos_version" | cut -d. -f1)
-
-    # Check if the major version is 14 to adjust paths
-    if [ "$major_version" == "14" ]; then
-        export LDFLAGS="-L/opt/homebrew/opt/libarchive/lib"
-        export CPPFLAGS="-I/opt/homebrew/opt/libarchive/include -std=c++11"
-    else
-        export LDFLAGS="-L/usr/local/opt/libarchive/lib" 
-        export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"
-    fi
+    export LDFLAGS="-L/usr/local/lib" 
+    export CPPFLAGS="-I/usr/local/include -std=c++11"
 else
     make install
 fi
 
 cd ..
-
-ls /usr/local/include
-ls /usr/local/lib
 
 mkdir -p build
 cd build
