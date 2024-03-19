@@ -16,13 +16,14 @@ cd libarchive
 cmake -DCMAKE_BUILD_TYPE=Release .
 make -j4
 if [ "$(uname)" == "Darwin" ]; then
+    sudo make install
     macos_version=$(sw_vers -productVersion)
 
     # Extract the major version number
     major_version=$(echo "$macos_version" | cut -d. -f1)
 
-    # Check if the major version is 13 or 14
-    if [ "$major_version" == "14"]; then
+    # Check if the major version is 14 to adjust paths
+    if [ "$major_version" == "14" ]; then
         export LDFLAGS="-L/opt/homebrew/opt/libarchive/lib"
         export CPPFLAGS="-I/opt/homebrew/opt/libarchive/include -std=c++11"
         ls /opt/homebrew/opt/libarchive/lib
@@ -33,7 +34,6 @@ if [ "$(uname)" == "Darwin" ]; then
         ls /usr/local/opt/libarchive/lib
         ls /usr/local/opt/libarchive/include
     fi
-    sudo make install
 else
     make install
 fi
