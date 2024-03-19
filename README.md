@@ -1,22 +1,20 @@
 # GBDC: Global Benchmark Database, C++ Extension Module
 
-<!--
 [![Linux Build-Test](https://github.com/Udopia/gbdc/actions/workflows/linux_build_test.yml/badge.svg?branch=master)](https://github.com/Udopia/gbdc/actions/workflows/linux_build_test.yml)
 [![MacOS 12 Build-Test](https://github.com/Udopia/gbdc/actions/workflows/macos12_build_test.yml/badge.svg?branch=master)](https://github.com/Udopia/gbdc/actions/workflows/macos12_build_test.yml)
 [![MacOS 14 Build-Test](https://github.com/Udopia/gbdc/actions/workflows/macos14_build_test.yml/badge.svg?branch=master)](https://github.com/Udopia/gbdc/actions/workflows/macos14_build_test.yml)
 [![Windows Build-Test](https://github.com/Udopia/gbdc/actions/workflows/windows_build_test.yml/badge.svg?branch=master)](https://github.com/Udopia/gbdc/actions/workflows/windows_build_test.yml)
--->
 
 [GBDC](https://github.com/Udopia/gbdc) provides efficient implementations of functions for benchmark instance identification, instance feature extraction and instance transformation.
 GBDC provides a command-line tool as well as the Python package `gbdc`.
 The Python package `gbdc` is used by [Global Benchmark Database](https://github.com/Udopia/gbd).
 
-## [Documentation](doc/Index.html)
+## [Documentation](https://udopia.github.io/gbdc/doc/Index.html)
 
 GBDC provides benchmark instance identifiers, feature extractors, and instance transformers for several problem domains, including propositional satisfiability (SAT) and optimization (MaxSAT), as well as Pseudo-Boolean Optimization (PBO).
-A description of the supported domains, feature extractors, and instance transformers can be found in the [documentation](doc/Index.html).
+A description of the supported domains, feature extractors, and instance transformers can be found in the [documentation](https://udopia.github.io/gbdc/doc/Index.html).
 
-## Installation
+## Installation from Source
 
 * GBDC uses `libarchive` for reading from a large variety of compressed formats (in some systems provided by the package `libarchive-dev`).
 * Some GBDC functions use an [IPASIR](https://github.com/biotomas/ipasir) SAT Solver. GBDC's build-system pulls the external SAT Solver [CaDiCaL](http://fmv.jku.at/cadical/) by A. Biere (MIT licensed).
@@ -28,7 +26,7 @@ A description of the supported domains, feature extractors, and instance transfo
 
 2. Run the installation script `install-pymod.sh` within the repository directory.
 
-### Experimental:
+## Installation from PyPI (Experimental):
 The PyPI package `gbdc` contains pre-built distributions that can be installed via `pip install gbdc`. However, please note that some platform-specific distributions may be missing and that existing ones have not undergone extensive testing yet.
 <!-- #### Shipped Dependencies
 
