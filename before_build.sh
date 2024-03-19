@@ -19,6 +19,11 @@ make install
 
 cd ..
 
+if [ "$(uname)" == "Darwin" ]; then
+    export LDFLAGS="-L/usr/local/libarchive/lib" 
+    export CPPFLAGS="-I/usr/local/libarchive/include -std=c++11"
+fi
+
 mkdir -p build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
