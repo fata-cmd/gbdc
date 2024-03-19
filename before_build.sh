@@ -14,18 +14,17 @@ fi
 git clone https://github.com/libarchive/libarchive.git
 cd libarchive
 cmake -DCMAKE_BUILD_TYPE=Release .
-make -j$(nproc)
+make -j4
 make install
 cd ..
 
-git clone https://github.com/arminbiere/cadical.git
-cd cadical
-cmake -DCMAKE_BUILD_TYPE=Release .
-make -j$(nproc)
-make install
+mkdir -p build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j4
 cd ..
 
-cmake -DCMAKE_BUILD_TYPE=Release .
+
 # mkdir gbd_test
 # cd gbd_test
 
