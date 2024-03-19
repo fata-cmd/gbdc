@@ -26,13 +26,9 @@ if [ "$(uname)" == "Darwin" ]; then
     if [ "$major_version" == "14" ]; then
         export LDFLAGS="-L/opt/homebrew/opt/libarchive/lib"
         export CPPFLAGS="-I/opt/homebrew/opt/libarchive/include -std=c++11"
-        ls /opt/homebrew/opt/libarchive/lib
-        ls /opt/homebrew/opt/libarchive/include
     else
         export LDFLAGS="-L/usr/local/opt/libarchive/lib" 
         export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"
-        ls /usr/local/opt/libarchive/lib
-        ls /usr/local/opt/libarchive/include
     fi
 else
     make install
@@ -40,6 +36,8 @@ fi
 
 cd ..
 
+ls /usr/local/include
+ls /usr/local/lib
 
 mkdir -p build
 cd build
