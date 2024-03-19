@@ -16,6 +16,7 @@ cd libarchive
 cmake -DCMAKE_BUILD_TYPE=Release .
 make -j4
 make install
+
 cd ..
 
 mkdir -p build

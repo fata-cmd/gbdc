@@ -55,7 +55,8 @@ jobs:
         # -S ${{ github.workspace }}
 
         CIBW_BUILD_VERBOSITY: 3
-        CIBW_BEFORE_BUILD: bash before_build.sh
+        CIBW_BEFORE_ALL_LINUX: bash before_build.sh
+        CIBW_BEFORE_ALL_MACOS: bash before_build.sh
       with:        
         package-dir: .
         output-dir: wheelhouse
