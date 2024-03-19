@@ -17,8 +17,8 @@ cmake -DCMAKE_BUILD_TYPE=Release .
 make -j4
 if [ "$(uname)" == "Darwin" ]; then
     sudo make install
-    export LDFLAGS="-L/usr/local/opt/lib" 
-    export CPPFLAGS="-I/usr/local/opt/include -std=c++11"
+    export LDFLAGS="-L/usr/local/opt/libarchive/lib" 
+    export CPPFLAGS="-I/usr/local/opt/libarchive/include -std=c++11"
 else
     make install
 fi
