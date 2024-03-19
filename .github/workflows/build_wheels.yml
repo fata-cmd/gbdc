@@ -5,6 +5,7 @@ on:
     branches: [ master ]
     tags: 'v*.*.*'
 
+  workflow_dispatch:
 jobs:
         
   build:
@@ -54,13 +55,14 @@ jobs:
         # -S ${{ github.workspace }}
 
         CIBW_BUILD_VERBOSITY: 3
-        CIBW_BEFORE_BUILD:  
+        CIBW_BEFORE_BUILD: bash before_build.sh
       with:        
+        package-dir: .
         output-dir: wheelhouse
         
     - name: Run tests
-      working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      run: ctest --build-config ${{ matrix.build_type }}
+      working-directory: output-dir
+      run: ctest
         
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
@@ -71,6 +73,7 @@ jobs:
   upload:
     needs: build
     runs-on: ubuntu-latest
+    if: startsWith(github.ref_name, 'v')  
 
     steps:
     - name: Change version in setup.py
