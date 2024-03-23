@@ -40,5 +40,5 @@ jobs:
 
     - name: Run tests
       run: |
-        sudo cd build
-        sudo ctest
+        cd build
+        ctest
