@@ -10,6 +10,7 @@ cd libarchive
 cmake -DCMAKE_BUILD_TYPE=Release .
 make -j4
 if [ "$(uname)" == "Darwin" ]; then
+    sudo make install
     export LDFLAGS="-L/usr/local/lib" 
     export CPPFLAGS="-I/usr/local/include -std=c++11"
 else
