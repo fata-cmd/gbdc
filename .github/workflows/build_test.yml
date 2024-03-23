@@ -36,8 +36,7 @@ jobs:
 
     - name: Build
       run: |
-        export CPPFLAGS="-I/usr/local/include -std=c++11"
-        bash before_build.sh dontChangeCwd
+        sudo bash before_build.sh dontChangeCwd
 
     - name: Run tests
       run: |
