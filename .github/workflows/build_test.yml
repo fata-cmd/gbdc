@@ -36,10 +36,9 @@ jobs:
 
     - name: Build
       run: |
-        sudo bash before_build.sh dontChangeCwd
+        bash before_build.sh dontChangeCwd
 
     - name: Run tests
       run: |
-        sudo chmod a+rwx build
         cd build
         ctest
