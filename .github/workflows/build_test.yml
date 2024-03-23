@@ -40,5 +40,6 @@ jobs:
 
     - name: Run tests
       run: |
+        chmod a+rwx build
         cd build
         ctest
