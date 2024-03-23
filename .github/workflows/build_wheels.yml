@@ -59,20 +59,20 @@ jobs:
         MACOSX_DEPLOYMENT_TARGET: "10.15"
         CIBW_BUILD_FRONTEND: build # python -m build --wheel
         CIBW_ARCHS_MACOS: auto
-        CIBW_ARCHS_LINUX: auto #aarch64 # ppc64le s390x
+        CIBW_ARCHS_LINUX: auto aarch64 ppc64le s390x
         CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-        # CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
-        # CIBW_MANYLINUX_PPC64LE_IMAGE: manylinux_2_28
-        # CIBW_MANYLINUX_S390X_IMAGE: manylinux_2_28
+        CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+        CIBW_MANYLINUX_PPC64LE_IMAGE: manylinux_2_28
+        CIBW_MANYLINUX_S390X_IMAGE: manylinux_2_28
         # CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux_2_28
         # CIBW_MANYLINUX_PYPY_AARCH64_IMAGE: manylinux_2_28
-        # CIBW_MUSLLINUX_X86_64_IMAGE: musllinux_1_2
-        # CIBW_MUSLLINUX_AARCH64_IMAGE: musllinux_1_2
-        # CIBW_MUSLLINUX_PPC64LE_IMAGE: musllinux_1_2
-        # CIBW_MUSLLINUX_S390X_IMAGE: musllinux_1_2
+        CIBW_MUSLLINUX_X86_64_IMAGE: musllinux_1_2
+        CIBW_MUSLLINUX_AARCH64_IMAGE: musllinux_1_2
+        CIBW_MUSLLINUX_PPC64LE_IMAGE: musllinux_1_2
+        CIBW_MUSLLINUX_S390X_IMAGE: musllinux_1_2
         # skip PyPy, 3.6 - 3.9 and 32-bit builds
-        CIBW_BUILD: cp312-mac* cp312-manylinux_x86_64 # cp31*-manylinux_aarch64
-        CIBW_SKIP: pp* cp36-* cp37-* cp38-* cp39-* *win* *i686* *musl* *universal2*
+        # CIBW_BUILD: cp31*-mac* cp31*-manylinux_x86_64 cp31*-manylinux_aarch64 cp31*-manylinux_pp* cp31*-manylinux_s39*
+        CIBW_SKIP: pp* cp36* cp37* cp38* cp39* cp310* cp311* *win* *i686* *universal2*
         # cmake -B ${{ steps.strings.outputs.build-output-dir }}
         # -DCMAKE_BUILD_TYPE="Release"
         # -S ${{ github.workspace }}
