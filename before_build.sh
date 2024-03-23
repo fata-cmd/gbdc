@@ -12,8 +12,9 @@ make -j4
 if [ "$(uname)" == "Darwin" ]; then
     export LDFLAGS="-L/usr/local/lib" 
     export CPPFLAGS="-I/usr/local/include -std=c++11"
+else
+    make install
 fi
-sudo make install
 
 cd ..
 
