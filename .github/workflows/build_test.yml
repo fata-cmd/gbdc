@@ -30,7 +30,6 @@ jobs:
     - name: Run tests
       run: |
         cd build
-        export C_INCLUDE_PATH=/usr/local/include:$C_INCLUDE_PATH
-        ctest
+        ctest --debug
   
       
