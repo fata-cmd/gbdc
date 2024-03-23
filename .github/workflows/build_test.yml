@@ -36,7 +36,7 @@ jobs:
 
     - name: Build
       run: |
-        bash build.sh
+        bash build_archive_cmake.sh
 
     - name: Run tests
       run: |
