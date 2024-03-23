@@ -49,7 +49,7 @@ jobs:
         # CIBW_MUSLLINUX_PPC64LE_IMAGE: musllinux_1_2
         # CIBW_MUSLLINUX_S390X_IMAGE: musllinux_1_2
         # skip PyPy, 3.6 - 3.9 and 32-bit builds
-        CIBW_BUILD: cp312-mac* cp31*-manylinux_x86_64 cp31*-manylinux_aarch64
+        CIBW_BUILD: cp312-mac* cp312-manylinux_x86_64 # cp31*-manylinux_aarch64
         CIBW_SKIP: pp* cp36-* cp37-* cp38-* cp39-* *win* *i686* *musl* *universal2*
         # cmake -B ${{ steps.strings.outputs.build-output-dir }}
         # -DCMAKE_BUILD_TYPE="Release"
