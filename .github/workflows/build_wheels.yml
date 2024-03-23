@@ -78,6 +78,12 @@ jobs:
     if: startsWith(github.ref_name, 'v')  
 
     steps:
+    - uses: actions/checkout@v4
+      # Add ssh-key to clone repository cadical
+    - uses: webfactory/ssh-agent@v0.9.0
+      with: 
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}      
+        
     - name: Change version in setup.py
       working-directory: ${{ github.workspace }}
       run: |
