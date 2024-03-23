@@ -36,7 +36,7 @@ jobs:
 
     - name: Build
       run: |
-        bash before_build.sh
+        bash before_build.sh dontChangeCwd
       shell: bash
 
     - name: Set reusable strings
