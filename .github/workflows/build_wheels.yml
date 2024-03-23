@@ -8,24 +8,28 @@ on:
   workflow_dispatch:
 jobs:
   versioning:
-    if: startsWith(github.ref_name, 'v')  
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-
+      with:
+        ref: master
+ 
     - name: Change version in setup.py
+      if: startsWith(github.ref_name, 'v')  
       working-directory: ${{ github.workspace }}
       run: |
          PYPI_VERSION=$(echo ${{ github.ref_name }} | sed 's/[a-zA-Z]*//g')
          sed -i "s/version=\"[^\"]*\"/version=\"$PYPI_VERSION\"/" setup.py
     
     - name: Push to github
+      if: startsWith(github.ref_name, 'v')  
       uses: EndBug/add-and-commit@v9 # You can change this to use a specific version.
       with:
         message: 'Change setup.py version'
       
   build:
     runs-on: ${{ matrix.os }}
+    needs: versioning
 
     strategy:
       # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
@@ -93,10 +97,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      # Add ssh-key to clone repository cadical
-    - uses: webfactory/ssh-agent@v0.9.0
-      with: 
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}      
 
     - name: Download artifacts
       uses: actions/download-artifact@v4
