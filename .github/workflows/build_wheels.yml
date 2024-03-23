@@ -7,7 +7,23 @@ on:
 
   workflow_dispatch:
 jobs:
-        
+  versioning:
+    if: startsWith(github.ref_name, 'v')  
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Change version in setup.py
+      working-directory: ${{ github.workspace }}
+      run: |
+         PYPI_VERSION=$(echo ${{ github.ref_name }} | sed 's/[a-zA-Z]*//g')
+         sed -i "s/version=\"[^\"]*\"/version=\"$PYPI_VERSION\"/" setup.py
+    
+    - name: Push to github
+      uses: EndBug/add-and-commit@v9 # You can change this to use a specific version.
+      with:
+        message: 'Change setup.py version'
+      
   build:
     runs-on: ${{ matrix.os }}
 
@@ -58,7 +74,7 @@ jobs:
         CIBW_BUILD_VERBOSITY: 3
         CIBW_BEFORE_ALL_LINUX: bash before_build.sh
         CIBW_BEFORE_ALL_MACOS: bash before_build.sh
-        #CIBW_BEFORE_BUILD_MACOS: export CPPFLAGS="-I/usr/local/include -std=c++11"
+      
         CIBW_ENVIRONMENT_MACOS: CPPFLAGS="-I/usr/local/include -std=c++11"
       with:        
         package-dir: .
@@ -82,12 +98,6 @@ jobs:
       with: 
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}      
 
-    - name: Change version in setup.py
-      working-directory: ${{ github.workspace }}
-      run: |
-        PYPI_VERSION=$(echo ${{ github.ref_name }} | sed 's/[a-zA-Z]*//g')
-        sed -i "s/version=\"[^\"]*\"/version=\"$PYPI_VERSION\"/" setup.py
-    
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
