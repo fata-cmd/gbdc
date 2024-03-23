@@ -1,6 +1,7 @@
 add_executable(tests_streambuffer tests_streambuffer.cc)
 add_executable(tests_cnfbasefeatures tests_cnfbasefeatures.cc)
 add_executable(tests_streamcompressor tests_streamcompressor.cc)
+message(STATUS "LA_LIBRARIES_TESTS: ${LibArchive_LIBRARIES}")
 target_link_libraries(tests_streambuffer PUBLIC util ${LibArchive_LIBRARIES})
 target_link_libraries(tests_cnfbasefeatures PUBLIC util ${LibArchive_LIBRARIES})
 target_link_libraries(tests_streamcompressor PUBLIC util ${LibArchive_LIBRARIES})
