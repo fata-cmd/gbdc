@@ -32,6 +32,7 @@ jobs:
         platforms: all
 
     - name: Build wheels
+      if: runner.os == 'Linu'
       uses: pypa/cibuildwheel@v2.17.0
       env:
         MACOSX_DEPLOYMENT_TARGET: "10.15"
@@ -65,6 +66,7 @@ jobs:
         output-dir: wheelhouse
         
     - name: Upload artifacts
+      if: runner.os == 'Linu'
       uses: actions/upload-artifact@v4
       with:
         name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
