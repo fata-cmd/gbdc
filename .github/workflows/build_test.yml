@@ -30,6 +30,7 @@ jobs:
     - name: Run tests
       run: |
         cd build
-        ctest --debug
+        export LDFLAGS="-L/usr/local/lib" 
+        ctest
   
       
