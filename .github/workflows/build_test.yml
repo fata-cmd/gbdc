@@ -36,7 +36,7 @@ jobs:
 
     - name: Build
       run: |
-        bash before_build.sh dontChangeCwd
+        bash build.sh
 
     - name: Run tests
       run: |
