@@ -40,6 +40,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: master
     # Add ssh-key to clone repository cadical
     - uses: webfactory/ssh-agent@v0.9.0
       with: 
@@ -97,6 +99,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: master
 
     - name: Download artifacts
       uses: actions/download-artifact@v4
