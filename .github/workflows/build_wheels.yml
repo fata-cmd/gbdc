@@ -1,8 +1,7 @@
-name: Build-Test
+name: Build Wheels
 
 on:
   push:
-    branches: [ master ]
     tags: 'v*.*.*'
 
   workflow_dispatch:
