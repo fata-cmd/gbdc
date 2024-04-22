@@ -18,7 +18,7 @@ class BaseFeatures1 : public IExtractor {
     const char* filename_;
     std::vector<double> features;
     std::vector<std::string> names;
-    
+
     unsigned n_vars = 0, n_clauses = 0, bytes = 0, ccs = 0;
 
     // count occurences of clauses of small size
@@ -54,10 +54,13 @@ class BaseFeatures1 : public IExtractor {
         names.insert(names.end(), { "balancevars_mean", "balancevars_variance", "balancevars_min", "balancevars_max", "balancevars_entropy" });
     }
 
-    virtual ~BaseFeatures1() { }
+    virtual ~BaseFeatures1() { 
+        
+    }
 
     virtual void extract() {
-        StreamBuffer in(filename_);
+        StreamBuffer in(filename_,5);
+        in.init();
         UnionFind uf;
         Cl clause;
         while (in.readClause(clause)) {

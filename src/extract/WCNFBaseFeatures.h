@@ -282,6 +282,9 @@ class BaseFeatures2 : public IExtractor {
             }
         }
 
+        // close unused StreamBuffer
+        in.~StreamBuffer();
+
         // clause graph features
         StreamBuffer in2(filename_);
         while (in2.skipWhitespace()) {

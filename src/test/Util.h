@@ -4,6 +4,9 @@
 #include <unordered_map>
 #include <string>
 #include <random>
+#include <cstdlib>
+
+double string_to_double(std::string s);
 
 std::unordered_map<std::string, double> record_to_map(std::string record_file_name)
 {
@@ -18,11 +21,18 @@ std::unordered_map<std::string, double> record_to_map(std::string record_file_na
 
         if (std::getline(iss, key, '=') && std::getline(iss, value))
         {
-            map[key] = stod(value);
+            map[key] = string_to_double(value);
         }
     }
 
     record_file.close();
 
     return map;
+}
+
+double string_to_double(std::string s){
+    std::istringstream os(s);
+    double d;
+    os >> d;
+    return d;
 }

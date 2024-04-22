@@ -13,9 +13,11 @@ endif()
 add_executable(tests_streambuffer tests_streambuffer.cc)
 add_executable(tests_cnfbasefeatures tests_cnfbasefeatures.cc)
 add_executable(tests_streamcompressor tests_streamcompressor.cc)
+add_executable(tests_threadpool tests_threadpool.cc)
 target_link_libraries(tests_streambuffer PUBLIC util ${LibArchive_LIBRARIES})
 target_link_libraries(tests_cnfbasefeatures PUBLIC util ${LibArchive_LIBRARIES})
 target_link_libraries(tests_streamcompressor PUBLIC util ${LibArchive_LIBRARIES})
+target_link_libraries(tests_threadpool PUBLIC util ${LibArchive_LIBRARIES})
 
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)

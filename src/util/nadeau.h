@@ -4,7 +4,7 @@
  * License: Creative Commons Attribution 3.0 Unported License
  *          http://creativecommons.org/licenses/by/3.0/deed.en_US
  */
-
+#pragma once
 #if defined(_WIN32)
 #include <windows.h>
 #include <psapi.h>

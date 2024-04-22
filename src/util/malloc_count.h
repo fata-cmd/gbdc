@@ -16,7 +16,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -35,44 +35,95 @@
 #include <vector>
 
 #ifdef __cplusplus
-extern "C" { /* for inclusion from C++ */
+extern "C"
+{ /* for inclusion from C++ */
 #endif
 
-struct thread_data;
+    class TerminationRequest : public std::runtime_error
+    {
+    public:
+    TerminationRequest() : std::runtime_error("TerminationRequest") {}
+    explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg) {}
+    };
 
-extern thread_local std::uint64_t thread_id;
+    struct job_t
+    {
+        std::string path;
+        size_t file_size;
+        size_t emn = 0;    // estimated memory needed
+        size_t memnbt = 0; // memory needed before termination
+        job_t(std::string _path, size_t _file_size) : path(_path), file_size(_file_size) {}
 
-extern std::atomic<std::uint16_t> thread_id_counter;
+        void estimate_mem(double coeff)
+        {
+            if (coeff == 0.0)
+                emn = file_size;
+            else
+                emn = coeff * file_size;
+        }
+    };
 
-extern std::vector<thread_data> thread_mem;
+    struct thread_data
+    {
+        thread_data() {}
+        bool exception_alloc = false;
+        size_t mem_usage = 0;
+        size_t peak_mem_usage = 0;
+        size_t num_allocs = 0;
 
-extern std::condition_variable mem_cv;
+        void inc_mem(size_t size)
+        {
+            ++num_allocs;
+            mem_usage += size;
+            peak_mem_usage = std::max(mem_usage, peak_mem_usage);
+        }
 
-extern long long mem_max;
+        void dec_mem(size_t size)
+        {
+            mem_usage -= size;
+        }
 
-/* returns the currently allocated amount of memory */
-extern size_t malloc_count_current(void);
+        void reset_peak()
+        {
+            peak_mem_usage = 0;
+        }
+    };
 
-/* returns the current peak memory allocation */
-extern size_t malloc_count_peak(void);
+    extern thread_local std::uint64_t thread_id;
+    extern std::vector<thread_data> thread_mem;
+    extern long long mem_max;
+    extern std::atomic<uint16_t> threads_waiting;
+    extern uint16_t num_threads;
 
-/* resets the peak memory allocation to current */
-extern void malloc_count_reset_peak(void);
+    /* returns the currently allocated amount of memory */
+    extern size_t malloc_count_current(void);
 
-/* returns the total number of allocations */
-extern size_t malloc_count_num_allocs(void);
+    /* returns the current peak memory allocation */
+    extern size_t malloc_count_peak(void);
 
-/* typedef of callback function */
-typedef void (*malloc_count_callback_type)(void* cookie, size_t current);
+    /* resets the peak memory allocation to current */
+    extern void malloc_count_reset_peak(void);
 
-/* supply malloc_count with a callback function that is invoked on each change
- * of the current allocation. The callback function must not use
- * malloc()/realloc()/free() or it will go into an endless recursive loop! */
-extern void malloc_count_set_callback(malloc_count_callback_type cb,
-                                      void* cookie);
+    /* returns the total number of allocations */
+    extern size_t malloc_count_num_allocs(void);
 
-/* user function which prints current and peak allocation to stderr */
-extern void malloc_count_print_status(void);
+    /* returns true if job can fit into memory*/
+    extern bool reserve_memory(size_t size);
+
+    /* return reserved memory*/
+    extern void unreserve_memory(size_t size);
+
+    /* typedef of callback function */
+    typedef void (*malloc_count_callback_type)(void *cookie, size_t current);
+
+    /* supply malloc_count with a callback function that is invoked on each change
+     * of the current allocation. The callback function must not use
+     * malloc()/realloc()/free() or it will go into an endless recursive loop! */
+    extern void malloc_count_set_callback(malloc_count_callback_type cb,
+                                          void *cookie);
+
+    /* user function which prints current and peak allocation to stderr */
+    extern void malloc_count_print_status(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

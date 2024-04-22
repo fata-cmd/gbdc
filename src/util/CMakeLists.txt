@@ -4,7 +4,8 @@ add_library(util OBJECT
     SolverTypes.h
     Stamp.h
     StreamBuffer.h
-    ThreadPool.hh
+    ThreadPool.h
+    malloc_count.cc
 )
 
 add_library(MallocCount malloc_count.cc)
