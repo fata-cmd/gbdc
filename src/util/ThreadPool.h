@@ -17,22 +17,17 @@
 #include <tuple>
 #include <condition_variable>
 
-
 template <typename Extractor>
 class ThreadPool
 {
 private:
     size_t jobs_max;
     std::vector<job_t> jobs;
-    std::priority_queue<int> pq;
     std::vector<std::thread> threads;
-    std::atomic<std::uint32_t> curr_job_idx;
+    std::atomic<std::uint32_t> next_job_idx = 0;
     std::atomic<std::uint32_t> thread_id_counter;
-    std::condition_variable mem_cv;
-
-    Extractor *curr_ex;
     std::atomic<double> coeff_size = 0.0;
-
+    std::mutex jobs_m;
     bool done = false;
 
     void wait()
@@ -46,51 +41,58 @@ private:
 
     void work()
     {
+        threads_working.fetch_add(1, std::memory_order_relaxed);
         thread_id = thread_id_counter.fetch_add(1, std::memory_order_relaxed);
-        job_t *current_job;
-        while (!done)
+        std::uint32_t curr_job_idx;
+        while ((curr_job_idx = next_job_idx.fetch_add(1, std::memory_order_relaxed)) < jobs.size())
         {
-            std::uint32_t _curr_job_idx = curr_job_idx.fetch_add(1, std::memory_order_relaxed);
-            if (_curr_job_idx < jobs.size())
+            update_job_idx(curr_job_idx);
+            std::cerr << "Current job index: " << curr_job_idx << "\n";
+            job_t &curr_job = jobs[curr_job_idx];
+            try
             {
-                std::cerr << "Current job index: " << curr_job_idx << "\n";
-                current_job = &jobs[curr_job_idx];
-                current_job->estimate_mem(coeff_size);
-                Extractor ex(current_job->path.c_str());
-                try
-                {
-                    ex.extract();
-                    output_result(*current_job, ex);
-                    finish_job(*current_job);
-                }
-                catch (const TerminationRequest &tr)
-                {
-                    std::cerr << tr.what() << "\n";
-                    std::cerr << "Destroyed\n";
-                    thread_mem[thread_id].exception_alloc = false;
-                }
-                // start_job(_curr_job_idx);
-                // finish_job(*current_job);
+                curr_job.estimate_mem(coeff_size);
+                Extractor ex(curr_job.path.c_str());
+                ex.extract();
+                output_result(curr_job, ex);
+                finish_job(curr_job);
             }
-            else if (!done)
-                done = true;
+            catch (const TerminationRequest &tr)
+            {
+                std::cerr << tr.what() << "\n";
+                handle_termination(tr, curr_job);
+                requeue_job(curr_job);
+            }
         }
+        threads_working.fetch_sub(1, std::memory_order_relaxed);
     }
 
-    // void start_job(std::uint32_t job_idx)
-    // {
-    //     current_job = &jobs[job_idx];
-    //     current_job->estimate_mem(coeff_size);
-    //     Extractor ex(jobs[job_idx].path.c_str());
-    //     ex.extract();
-    //     output_result(jobs[job_idx], ex);
-    // }
-
-    void finish_job(const job_t &j)
+    void update_job_idx(std::uint32_t job_idx)
     {
-        adjust_coefficients(j);
-        unreserve_memory(j.emn);
-        mem_cv.notify_all();
+        thread_data[thread_id].job_idx = job_idx;
+        std::uint32_t tmp = last_job_idx.load(std::memory_order_relaxed);
+        while (job_idx > tmp && !last_job_idx.compare_exchange_weak(tmp, job_idx, std::memory_order_relaxed, std::memory_order_relaxed))
+            ;
+    }
+
+    void requeue_job(const job_t &job)
+    {
+        jobs_m.lock();
+        jobs.push_back(job);
+        jobs_m.unlock();
+    }
+
+    void handle_termination(const TerminationRequest &tr, job_t &curr_job)
+    {
+        curr_job.memnbt = thread_data[thread_id].peak_mem_usage;
+        thread_data[thread_id].exception_alloc = false;
+        thread_data[thread_id].reset();
+    }
+
+    void finish_job(const job_t &curr_job)
+    {
+        adjust_coefficients(curr_job);
+        unreserve_memory(curr_job.emn);
     }
 
     void output_result(const job_t &j, Extractor &ex)
@@ -104,11 +106,11 @@ private:
             result += names[i] + " = " + std::to_string(feats[i]) + "\n";
         }
         std::cerr << "FileSize: " << j.file_size << "\n";
-        std::cerr << result + "\n Current memory usage: " + std::to_string(thread_mem[thread_id].mem_usage) +
+        std::cerr << result + "\n Current memory usage: " + std::to_string(thread_data[thread_id].mem_usage) +
                          "\n Estimated memory usage: " + std::to_string(j.emn) +
-                         "\n Peak memory usage: " + std::to_string(thread_mem[thread_id].peak_mem_usage)
+                         "\n Peak memory usage: " + std::to_string(thread_data[thread_id].peak_mem_usage)
                   << std::endl;
-        thread_mem[thread_id].reset_peak();
+        thread_data[thread_id].reset();
     }
 
     void init_jobs(const std::vector<std::string> &_hashes)
@@ -127,31 +129,23 @@ private:
     {
         for (std::uint32_t i = 0; i < num_threads; ++i)
         {
-            thread_mem.emplace_back();
+            thread_data.emplace_back();
             threads.emplace_back(std::thread(&ThreadPool::work, this));
         }
     }
 
     void adjust_coefficients(const job_t &j)
     {
-        if (coeff_size.load(std::memory_order_relaxed) == 0.0)
-        {
-            coeff_size.store((double)thread_mem[thread_id].peak_mem_usage / j.file_size, std::memory_order_relaxed);
-        }
-        else
-        {
-            coeff_size.store((double)thread_mem[thread_id].peak_mem_usage / j.file_size + coeff_size.load(std::memory_order_relaxed) / 2.0, std::memory_order_relaxed);
-        }
-        std::cerr << "Coeff_size = " << coeff_size.load(std::memory_order_relaxed) << "\n";
     }
 
 public:
     explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
     {
         // thread_id = thread_id_counter.fetch_and_add(1, std::memory_order_relaxed);
+        cancel_me = std::function<bool()>([&]()
+                                          { return last_job_idx == thread_data[thread_id].job_idx; });
         mem_max = _mem_max;
         jobs_max = _jobs_max;
-        num_threads = jobs_max;
         init_jobs(_hashes);
         init_threads(_jobs_max);
         wait();

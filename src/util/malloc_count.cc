@@ -46,10 +46,12 @@
 
 constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
 thread_local std::uint64_t thread_id = SENTINEL_ID;
-std::vector<thread_data> thread_mem;
-long long mem_max = 1ULL << 30;
-uint16_t num_threads;
+std::vector<thread_data_t> thread_data;
+std::atomic<std::uint32_t> last_job_idx;
 std::atomic<uint16_t> threads_waiting = 0;
+std::atomic<uint16_t> threads_working;
+std::function<bool()> cancel_me;
+long long mem_max = 1ULL << 30;
 
 static const int log_operations = 0; /* <-- set this to 1 for log output */
 static const size_t log_operations_threshold = 1024 * 1024;
@@ -86,11 +88,11 @@ static const int log_operations_init_heap = 0;
 /* run-time memory allocation statistics */
 /*****************************************/
 
-static std::atomic<size_t> peak = 0, curr = 0, total = 0, reserved = 0, num_allocs = 0;
+static std::atomic<size_t> peak = 0, curr = 0, reserved = 0;
 
 static malloc_count_callback_type callback = NULL;
 static void *callback_cookie = NULL;
-static std::memory_order mem_order = std::memory_order_seq_cst;
+static std::memory_order relaxed = relaxed;
 
 /* add allocation to statistics */
 static void inc_count(size_t inc)
@@ -99,21 +101,17 @@ static void inc_count(size_t inc)
     long long mycurr = __sync_add_and_fetch(&curr, inc);
     if (mycurr > peak)
         peak = mycurr;
-    total += inc;
     if (callback)
         callback(callback_cookie, mycurr);
 #else
-    if ((curr += inc) > peak)
-        peak.store(curr, mem_order);
-    total += inc;
+    curr.fetch_add(inc, relaxed);
     if (thread_id != SENTINEL_ID)
     {
-        thread_mem[thread_id].inc_mem(inc);
+        thread_data[thread_id].inc_mem(inc);
     }
     if (callback)
         callback(callback_cookie, curr);
 #endif
-    ++num_allocs;
 }
 
 /* decrement allocation to statistics */
@@ -126,7 +124,7 @@ static void dec_count(size_t dec)
 #else
     curr -= dec;
     if (thread_id != SENTINEL_ID)
-        thread_mem[thread_id].dec_mem(dec);
+        thread_data[thread_id].dec_mem(dec);
     if (callback)
         callback(callback_cookie, curr);
 #endif
@@ -135,7 +133,7 @@ static void dec_count(size_t dec)
 /* user function to return the currently allocated amount of memory */
 extern size_t malloc_count_current(void)
 {
-    return curr.load(std::memory_order_relaxed);
+    return curr.load(relaxed);
 }
 
 /* user function to return the peak allocation */
@@ -147,13 +145,7 @@ extern size_t malloc_count_peak(void)
 /* user function to reset the peak allocation to current */
 extern void malloc_count_reset_peak(void)
 {
-    peak.store(curr, mem_order);
-}
-
-/* user function to return total number of allocations */
-extern size_t malloc_count_num_allocs(void)
-{
-    return num_allocs;
+    peak.store(curr, relaxed);
 }
 
 /* user function which prints current and peak allocation to stderr */
@@ -161,11 +153,6 @@ extern void malloc_count_print_status(void)
 {
     fprintf(stderr, PPREFIX "current %'lld, peak %'lld\n",
             (long long)curr.load(), (long long)peak.load());
-}
-
-inline void terminate()
-{
-    throw TerminationRequest("Answering termination request!");
 }
 
 /* user function to supply a memory profile callback */
@@ -178,24 +165,33 @@ void malloc_count_set_callback(malloc_count_callback_type cb, void *cookie)
 bool reserve_memory(size_t size)
 {
     bool exchanged = false;
-    size_t _curr = reserved.load(std::memory_order_relaxed);
-    while (_curr + size <= mem_max && !(exchanged = reserved.compare_exchange_weak(_curr, _curr + size, std::memory_order_relaxed, std::memory_order_relaxed)))
+    size_t _curr = reserved.load(relaxed);
+    while (_curr + size <= mem_max && !(exchanged = reserved.compare_exchange_weak(_curr, _curr + size, relaxed, relaxed)))
         ;
     return exchanged;
 }
 
 bool can_alloc(size_t size)
 {
+    if (thread_data[thread_id].exception_alloc)
+        return true;
     bool exchanged = false;
-    size_t _curr = curr.load(std::memory_order_relaxed);
-    while (_curr + size <= mem_max && !(exchanged = curr.compare_exchange_weak(_curr, _curr + size, std::memory_order_relaxed, std::memory_order_relaxed)))
+    size_t _curr = curr.load(relaxed);
+    while (_curr + size <= mem_max && !(exchanged = curr.compare_exchange_weak(_curr, _curr + size, relaxed, relaxed)))
         ;
     return exchanged;
 }
 
+void terminate(size_t size)
+{
+    thread_data[thread_id].exception_alloc = true;
+    throw TerminationRequest("Thread " + std::to_string(thread_id) + " trying to allocate more memory than currently available! \n" +
+                             std::to_string(mem_max - curr.load()) + " < " + std::to_string(size));
+}
+
 void unreserve_memory(size_t size)
 {
-    reserved.fetch_sub(size, std::memory_order_relaxed);
+    reserved.fetch_sub(size, relaxed);
 }
 
 /****************************************************/
@@ -215,25 +211,24 @@ extern void *malloc(size_t size)
         /* call read malloc procedure in libc */
         ret = (*real_malloc)(alignment + size);
 
-        while (thread_id != SENTINEL_ID && !thread_mem[thread_id].exception_alloc && !can_alloc(size))
+        while (thread_id != SENTINEL_ID && !can_alloc(size))
         {
-            thread_mem[thread_id].exception_alloc = true;
-            throw TerminationRequest("Thread " + std::to_string(thread_id) + " trying to allocate more memory than available! \n" + 
-            std::to_string(mem_max) + " < " + std::to_string(curr.load() + size));
-            return NULL;
-            // uint16_t nr = threads_waiting.fetch_add(1, std::memory_order_relaxed);
-            // if (nr == num_threads)
-            // {
-            //     // abort_youngest_job();
-            // }
+            if (!thread_data[thread_id].waiting)
+            {
+                threads_waiting.fetch_add(1, relaxed);
+                thread_data[thread_id].waiting = true;
+            }
+            if (threads_waiting.load(relaxed) == threads_working.load(relaxed) && cancel_me())
+            {
+                terminate(size);
+            }
         }
-
+        if (thread_id != SENTINEL_ID && thread_data[thread_id].waiting)
+        {
+            thread_data[thread_id].waiting = false;
+            threads_waiting.fetch_sub(1, relaxed);
+        }
         inc_count(size);
-        if (log_operations && size >= log_operations_threshold)
-        {
-            fprintf(stderr, PPREFIX "malloc(%'lld) = %p   (current %'lld)\n",
-                    (long long)size, (char *)ret + alignment, (long long)curr.load());
-        }
 
         /* prepend allocation size and check sentinel */
         *(size_t *)ret = size;
@@ -256,12 +251,6 @@ extern void *malloc(size_t size)
         *(size_t *)ret = size;
         *(size_t *)((char *)ret + alignment - sizeof(size_t)) = sentinel;
 
-        if (log_operations_init_heap)
-        {
-            fprintf(stderr, PPREFIX "malloc(%'lld) = %p   on init heap\n",
-                    (long long)size, (char *)ret + alignment);
-        }
-
         return (char *)ret + alignment;
     }
 }
@@ -277,10 +266,6 @@ extern void free(void *ptr)
     if ((char *)ptr >= init_heap &&
         (char *)ptr <= init_heap + init_heap_use)
     {
-        if (log_operations_init_heap)
-        {
-            fprintf(stderr, PPREFIX "free(%p)   on init heap\n", ptr);
-        }
         return;
     }
 
@@ -299,12 +284,6 @@ extern void free(void *ptr)
 
     size = *(size_t *)ptr;
     dec_count(size);
-
-    if (log_operations && size >= log_operations_threshold)
-    {
-        fprintf(stderr, PPREFIX "free(%p) -> %'lld   (current %'lld)\n",
-                ptr, (long long)size, (long long)curr.load());
-    }
 
     (*real_free)(ptr);
 }
@@ -331,11 +310,6 @@ extern void *realloc(void *ptr, size_t size)
     if ((char *)ptr >= (char *)init_heap &&
         (char *)ptr <= (char *)init_heap + init_heap_use)
     {
-        if (log_operations_init_heap)
-        {
-            fprintf(stderr, PPREFIX "realloc(%p) = on init heap\n", ptr);
-        }
-
         ptr = (char *)ptr - alignment;
 
         if (*(size_t *)((char *)ptr + alignment - sizeof(size_t)) != sentinel)
@@ -388,16 +362,6 @@ extern void *realloc(void *ptr, size_t size)
 
     newptr = (*real_realloc)(ptr, alignment + size);
 
-    if (log_operations && size >= log_operations_threshold)
-    {
-        if (newptr == ptr)
-            fprintf(stderr, PPREFIX "realloc(%'lld -> %'lld) = %p   (current %'lld)\n",
-                    (long long)oldsize, (long long)size, newptr, (long long)curr.load());
-        else
-            fprintf(stderr, PPREFIX "realloc(%'lld -> %'lld) = %p -> %p   (current %'lld)\n",
-                    (long long)oldsize, (long long)size, ptr, newptr, (long long)curr.load());
-    }
-
     *(size_t *)newptr = size;
 
     return (char *)newptr + alignment;
@@ -435,8 +399,8 @@ static __attribute__((constructor)) void init(void)
 
 static __attribute__((destructor)) void finish(void)
 {
-    fprintf(stderr, PPREFIX "exiting, total: %'lld, peak: %'lld, current: %'lld\n",
-            (long long)total.load(), (long long)peak.load(), (long long)curr.load());
+    fprintf(stderr, PPREFIX "exiting, peak: %'lld, current: %'lld\n",
+            (long long)peak.load(), (long long)curr.load());
 }
 
 /*****************************************************************************/

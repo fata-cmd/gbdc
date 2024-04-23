@@ -42,8 +42,8 @@ extern "C"
     class TerminationRequest : public std::runtime_error
     {
     public:
-    TerminationRequest() : std::runtime_error("TerminationRequest") {}
-    explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg) {}
+        TerminationRequest() : std::runtime_error("TerminationRequest") {}
+        explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg) {}
     };
 
     struct job_t
@@ -63,13 +63,19 @@ extern "C"
         }
     };
 
-    struct thread_data
+    struct thread_data_t
     {
-        thread_data() {}
-        bool exception_alloc = false;
-        size_t mem_usage = 0;
-        size_t peak_mem_usage = 0;
-        size_t num_allocs = 0;
+        thread_data_t() {}
+        bool exception_alloc = false; // used to pass allocation checks when calling malloc
+        bool waiting = false; // true if waiting for memory to be freed up
+        size_t mem_usage = 0; // currently allocated memory
+        size_t peak_mem_usage = 0; // peak allocated memory for current job
+        size_t num_allocs = 0; // number of calls to malloc for current job
+        std::uint32_t job_idx; // index of current job
+
+        void set_job_idx(std::uint32_t _job_idx){
+            job_idx = _job_idx;
+        }
 
         void inc_mem(size_t size)
         {
@@ -83,17 +89,22 @@ extern "C"
             mem_usage -= size;
         }
 
-        void reset_peak()
+        void reset()
         {
             peak_mem_usage = 0;
+            num_allocs = 0;
+            exception_alloc = false;
+            waiting = false;
         }
     };
 
     extern thread_local std::uint64_t thread_id;
-    extern std::vector<thread_data> thread_mem;
+    extern std::vector<thread_data_t> thread_data;
+    extern std::atomic<std::uint32_t> last_job_idx;
+    extern std::function<bool()> cancel_me;
     extern long long mem_max;
     extern std::atomic<uint16_t> threads_waiting;
-    extern uint16_t num_threads;
+    extern std::atomic<uint16_t> threads_working;
 
     /* returns the currently allocated amount of memory */
     extern size_t malloc_count_current(void);
