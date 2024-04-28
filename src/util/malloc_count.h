@@ -33,6 +33,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <vector>
+#include <algorithm>
 
 #ifdef __cplusplus
 extern "C"
@@ -54,12 +55,8 @@ extern "C"
         size_t memnbt = 0; // memory needed before termination
         job_t(std::string _path, size_t _file_size) : path(_path), file_size(_file_size) {}
 
-        void estimate_mem(double coeff)
+        void estimate_memory_usage()
         {
-            if (coeff == 0.0)
-                emn = file_size;
-            else
-                emn = coeff * file_size;
         }
     };
 
@@ -67,13 +64,14 @@ extern "C"
     {
         thread_data_t() {}
         bool exception_alloc = false; // used to pass allocation checks when calling malloc
-        bool waiting = false; // true if waiting for memory to be freed up
-        size_t mem_usage = 0; // currently allocated memory
-        size_t peak_mem_usage = 0; // peak allocated memory for current job
-        size_t num_allocs = 0; // number of calls to malloc for current job
-        std::uint32_t job_idx; // index of current job
+        bool waiting = false;         // true if waiting for memory to be freed up
+        size_t mem_usage = 0;         // currently allocated memory
+        size_t peak_mem_usage = 0;    // peak allocated memory for current job
+        size_t num_allocs = 0;        // number of calls to malloc for current job
+        std::uint32_t job_idx = 0;    // index of current job
 
-        void set_job_idx(std::uint32_t _job_idx){
+        void set_job_idx(std::uint32_t _job_idx)
+        {
             job_idx = _job_idx;
         }
 
@@ -102,7 +100,7 @@ extern "C"
     extern std::vector<thread_data_t> thread_data;
     extern std::atomic<std::uint32_t> last_job_idx;
     extern std::function<bool()> cancel_me;
-    extern long long mem_max;
+    extern std::uint64_t mem_max;
     extern std::atomic<uint16_t> threads_waiting;
     extern std::atomic<uint16_t> threads_working;
 
@@ -119,10 +117,15 @@ extern "C"
     extern size_t malloc_count_num_allocs(void);
 
     /* returns true if job can fit into memory*/
+    extern bool can_alloc(size_t size);
+
+    /* returns true if job can fit into memory*/
     extern bool reserve_memory(size_t size);
 
     /* return reserved memory*/
     extern void unreserve_memory(size_t size);
+
+    extern void update_threshold();
 
     /* typedef of callback function */
     typedef void (*malloc_count_callback_type)(void *cookie, size_t current);

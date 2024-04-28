@@ -51,7 +51,10 @@ std::atomic<std::uint32_t> last_job_idx;
 std::atomic<uint16_t> threads_waiting = 0;
 std::atomic<uint16_t> threads_working;
 std::function<bool()> cancel_me;
-long long mem_max = 1ULL << 30;
+
+
+std::uint64_t mem_max = 1ULL << 30;
+std::uint64_t threshold;
 
 static const int log_operations = 0; /* <-- set this to 1 for log output */
 static const size_t log_operations_threshold = 1024 * 1024;
@@ -76,7 +79,7 @@ static realloc_type real_realloc = NULL;
 static const size_t sentinel = 0xDEADC0DE;
 
 /* a simple memory heap for allocations prior to dlsym loading */
-#define INIT_HEAP_SIZE 512 * 512
+#define INIT_HEAP_SIZE 256 * 256
 static char init_heap[INIT_HEAP_SIZE];
 static size_t init_heap_use = 0;
 static const int log_operations_init_heap = 0;
@@ -92,7 +95,7 @@ static std::atomic<size_t> peak = 0, curr = 0, reserved = 0;
 
 static malloc_count_callback_type callback = NULL;
 static void *callback_cookie = NULL;
-static std::memory_order relaxed = relaxed;
+static std::memory_order relaxed = std::memory_order_relaxed;
 
 /* add allocation to statistics */
 static void inc_count(size_t inc)
@@ -162,6 +165,10 @@ void malloc_count_set_callback(malloc_count_callback_type cb, void *cookie)
     callback_cookie = cookie;
 }
 
+void update_threshold(){
+    threshold = threads_working.load(relaxed) * 1e7; // 10MB per job
+}
+
 bool reserve_memory(size_t size)
 {
     bool exchanged = false;
@@ -175,6 +182,8 @@ bool can_alloc(size_t size)
 {
     if (thread_data[thread_id].exception_alloc)
         return true;
+    if (mem_max - curr.load(relaxed) < threshold)
+        return false;
     bool exchanged = false;
     size_t _curr = curr.load(relaxed);
     while (_curr + size <= mem_max && !(exchanged = curr.compare_exchange_weak(_curr, _curr + size, relaxed, relaxed)))
