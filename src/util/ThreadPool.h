@@ -60,7 +60,6 @@ private:
     std::atomic<std::uint32_t> next_job_idx = 0;
     std::atomic<std::uint32_t> thread_id_counter;
     std::vector<std::atomic<double>> coeffs;
-    std::atomic<bool> can_continue = true;
     std::mutex jobs_m;
 
     void wait_for_completion()
@@ -81,7 +80,6 @@ private:
 
     void work()
     {
-        threads_working.fetch_add(1, std::memory_order_relaxed);
         thread_id = thread_id_counter.fetch_add(1, std::memory_order_relaxed);
         std::uint32_t curr_job_idx;
         while ((curr_job_idx = next_job_idx.fetch_add(1, std::memory_order_relaxed)) < jobs.size())
@@ -89,7 +87,6 @@ private:
             job_t &curr_job = jobs[curr_job_idx];
             try
             {
-                curr_job.estimate_memory_usage();
                 wait_for_starting_permission(curr_job);
                 update_job_idx(curr_job_idx);
                 Extractor ex(curr_job.path.c_str());
@@ -100,10 +97,8 @@ private:
             catch (const TerminationRequest &tr)
             {
                 std::cerr << tr.what() << "\n";
-                can_continue.store(false);
                 requeue_job(curr_job);
                 cleanup_termination(tr, curr_job);
-                // update last_job_index
             }
         }
         stop_working();
@@ -112,30 +107,21 @@ private:
     void stop_working()
     {
         ++threads_finished;
-        update_threshold();
     }
 
     void wait_for_starting_permission(const job_t &job)
     {
-        while (!can_start(job) || (!can_continue.load(std::memory_order_relaxed) && threads_working.load(std::memory_order_relaxed) != 1))
+        while (threads_working.load(std::memory_order_relaxed) != 1 && !can_start(job.memnbt))
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         ++threads_working;
     }
 
-    bool can_start(const job_t &job)
-    {
-        return can_alloc(job.memnbt);
-    }
-
     void update_job_idx(std::uint32_t job_idx)
     {
         std::cerr << "Current job index: " << job_idx << "\n";
         thread_data[thread_id].job_idx = job_idx;
-        std::uint32_t tmp = last_job_idx.load(std::memory_order_relaxed);
-        while (job_idx > tmp && !last_job_idx.compare_exchange_weak(tmp, job_idx, std::memory_order_relaxed, std::memory_order_relaxed))
-            ;
     }
 
     void requeue_job(job_t &job)
@@ -153,15 +139,12 @@ private:
     void cleanup_termination(const TerminationRequest &tr, job_t &curr_job)
     {
         thread_data[thread_id].reset();
-        thread_data[thread_id].exception_alloc = false;
         --threads_working;
+        termination_ongoing.store(false);
     }
 
     void finish_job(const job_t &curr_job)
     {
-        adjust_coefficients(curr_job);
-        unreserve_memory(curr_job.emn);
-        can_continue.store(true);
         --threads_working;
     }
 
@@ -211,9 +194,6 @@ private:
 public:
     explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
     {
-        // thread_id = thread_id_counter.fetch_and_add(1, std::memory_order_relaxed);
-        cancel_me = std::function<bool()>([&]()
-                                          { return last_job_idx == thread_data[thread_id].job_idx; });
         mem_max = _mem_max;
         jobs_max = _jobs_max;
         init_jobs(_hashes);

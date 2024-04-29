@@ -43,28 +43,24 @@ extern "C"
     class TerminationRequest : public std::runtime_error
     {
     public:
-        TerminationRequest() : std::runtime_error("TerminationRequest") {}
         explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg) {}
     };
+
+    constexpr std::uint64_t buffer_per_job = 1e7;
 
     struct job_t
     {
         std::string path;
         size_t file_size;
-        size_t emn = 0;    // estimated memory needed
-        size_t memnbt = 0; // memory needed before termination
+        size_t emn = 0;                 // estimated memory needed
+        size_t memnbt = buffer_per_job; // memory needed before termination
         job_t(std::string _path, size_t _file_size) : path(_path), file_size(_file_size) {}
-
-        void estimate_memory_usage()
-        {
-        }
     };
 
     struct thread_data_t
     {
         thread_data_t() {}
         bool exception_alloc = false; // used to pass allocation checks when calling malloc
-        bool waiting = false;         // true if waiting for memory to be freed up
         size_t mem_usage = 0;         // currently allocated memory
         size_t peak_mem_usage = 0;    // peak allocated memory for current job
         size_t num_allocs = 0;        // number of calls to malloc for current job
@@ -92,17 +88,14 @@ extern "C"
             peak_mem_usage = 0;
             num_allocs = 0;
             exception_alloc = false;
-            waiting = false;
         }
     };
 
     extern thread_local std::uint64_t thread_id;
     extern std::vector<thread_data_t> thread_data;
-    extern std::function<bool()> cancel_me;
     extern std::uint64_t mem_max;
     extern std::atomic<uint16_t> threads_working;
-    constexpr std::uint64_t buffer_per_job = 1e7;
-
+    extern std::atomic<bool> termination_ongoing;
 
     /* returns the currently allocated amount of memory */
     extern size_t malloc_count_current(void);
@@ -113,19 +106,8 @@ extern "C"
     /* resets the peak memory allocation to current */
     extern void malloc_count_reset_peak(void);
 
-    /* returns the total number of allocations */
-    extern size_t malloc_count_num_allocs(void);
-
     /* returns true if job can fit into memory*/
-    extern bool can_alloc(size_t size);
-
-    /* returns true if job can fit into memory*/
-    extern bool reserve_memory(size_t size);
-
-    /* return reserved memory*/
-    extern void unreserve_memory(size_t size);
-
-    extern void update_threshold();
+    extern bool can_start(size_t size);
 
     /* typedef of callback function */
     typedef void (*malloc_count_callback_type)(void *cookie, size_t current);

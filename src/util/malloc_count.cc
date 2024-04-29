@@ -49,10 +49,9 @@ thread_local std::uint64_t thread_id = SENTINEL_ID;
 std::vector<thread_data_t> thread_data;
 std::atomic<std::uint32_t> last_job_idx;
 std::atomic<uint16_t> threads_working = 0;
-std::function<bool()> cancel_me;
+std::atomic<bool> termination_ongoing;
 
 std::uint64_t mem_max = 1ULL << 30;
-std::uint64_t threshold;
 
 static const int log_operations = 0; /* <-- set this to 1 for log output */
 static const size_t log_operations_threshold = 1024 * 1024;
@@ -89,7 +88,7 @@ static const int log_operations_init_heap = 0;
 /* run-time memory allocation statistics */
 /*****************************************/
 
-static std::atomic<size_t> peak = 0, curr = 0, reserved = 0;
+static std::atomic<size_t> peak = 0, curr = 0;
 
 static malloc_count_callback_type callback = NULL;
 static void *callback_cookie = NULL;
@@ -145,27 +144,22 @@ void malloc_count_set_callback(malloc_count_callback_type cb, void *cookie)
     callback_cookie = cookie;
 }
 
-void update_threshold()
+inline size_t threshold()
 {
-    threshold = threads_working.load(relaxed) * buffer_per_job; // 10MB per job
+    return buffer_per_job * threads_working.load(relaxed);
 }
 
-bool reserve_memory(size_t size)
-{
-    bool exchanged = false;
-    size_t _curr = reserved.load(relaxed);
-    while (_curr + size <= mem_max && !(exchanged = reserved.compare_exchange_weak(_curr, _curr + size, relaxed, relaxed)))
-        ;
-    return exchanged;
+bool can_start(size_t size){
+    return (curr.load(relaxed) + size) <= (mem_max - threshold());
 }
 
 bool can_alloc(size_t size)
 {
-    if (mem_max - curr.load(relaxed) < threshold)
+    if (mem_max - curr.load(relaxed) < threshold())
         return false;
     bool exchanged = false;
     size_t _curr = curr.load(relaxed);
-    while ((thread_data[thread_id].exception_alloc || (_curr + size <= mem_max - threshold)) &&
+    while ((thread_data[thread_id].exception_alloc || ((_curr + size) <= (mem_max - threshold()))) &&
            !(exchanged = curr.compare_exchange_weak(_curr, _curr + size, relaxed, relaxed)))
         ;
     return exchanged;
@@ -176,11 +170,6 @@ void terminate(size_t size)
     thread_data[thread_id].exception_alloc = true;
     throw TerminationRequest("Thread " + std::to_string(thread_id) + " trying to allocate more memory than currently available! \nCurrent: " +
                              std::to_string(mem_max - std::min(mem_max, curr.load())) + " < Desired: " + std::to_string(size));
-}
-
-void unreserve_memory(size_t size)
-{
-    reserved.fetch_sub(size, relaxed);
 }
 
 /****************************************************/
@@ -200,30 +189,17 @@ extern void *malloc(size_t size)
         /* call read malloc procedure in libc */
         ret = (*real_malloc)(alignment + size);
 
-        if (thread_id == SENTINEL_ID)
+        if (thread_id != SENTINEL_ID)
         {
-            inc_count(size);
-        }
-        else
-        {
-            while (!can_alloc(size))
+            if (!can_alloc(size))
             {
-                if (!thread_data[thread_id].waiting)
-                {
-                    threads_working.fetch_sub(1, relaxed);
-                    thread_data[thread_id].waiting = true;
-                }
-                if (threads_waiting.load(relaxed) == threads_working.load(relaxed)) // && cancel_me())
-                {
+                bool tmp = false;
+                if (termination_ongoing.compare_exchange_strong(tmp, true))
                     terminate(size);
-                }
+                else
+                    return malloc(size);
             }
             inc_count(size);
-            if (thread_data[thread_id].waiting)
-            {
-                thread_data[thread_id].waiting = false;
-                threads_waiting.fetch_sub(1, relaxed);
-            }
         }
 
         /* prepend allocation size and check sentinel */
