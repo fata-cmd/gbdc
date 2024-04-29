@@ -17,11 +17,36 @@
 #include <tuple>
 #include <condition_variable>
 
-struct data_t
+struct csv_t
 {
-    size_t time;
-    size_t mem;
-    size_t jobs;
+    std::ofstream of;
+    std::string s = "";
+    csv_t(const std::string &filename) : of(filename)
+    {
+        std::ofstream file(filename);
+        if (!file.is_open())
+        {
+            std::cerr << "Error opening file " << filename << std::endl;
+            return;
+        }
+        file << "Time,Memory,Jobs" << std::endl;
+    }
+
+    void write_to_file(std::initializer_list<size_t> data)
+    {
+        for (const auto &d : data)
+        {
+            s.append(std::to_string(d) + ",");
+        }
+        s.pop_back();
+        of << s << "\n";
+        s.clear();
+    }
+
+    void close_file()
+    {
+        of.close();
+    }
 };
 
 template <typename Extractor>
@@ -31,21 +56,22 @@ private:
     size_t jobs_max;
     std::vector<job_t> jobs;
     std::vector<std::thread> threads;
+    std::atomic<std::uint32_t> threads_finished = 0;
     std::atomic<std::uint32_t> next_job_idx = 0;
     std::atomic<std::uint32_t> thread_id_counter;
     std::vector<std::atomic<double>> coeffs;
-    std::vector<data_t> data;
     std::atomic<bool> can_continue = true;
     std::mutex jobs_m;
 
     void wait_for_completion()
     {
+        csv_t csv("data.csv");
         size_t begin = std::chrono::steady_clock::now().time_since_epoch().count();
         size_t tp;
-        while (threads_working.load(std::memory_order_relaxed))
+        while (threads_finished.load(std::memory_order_relaxed) != threads.size())
         {
             tp = std::chrono::steady_clock::now().time_since_epoch().count();
-            data.push_back({tp - begin, malloc_count_current(), threads_working.load(std::memory_order_relaxed)});
+            // csv.write_to_file({tp - begin, malloc_count_current(), threads_working.load(std::memory_order_relaxed)});
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         for (uint i = 0; i < threads.size(); ++i)
@@ -60,13 +86,12 @@ private:
         std::uint32_t curr_job_idx;
         while ((curr_job_idx = next_job_idx.fetch_add(1, std::memory_order_relaxed)) < jobs.size())
         {
-            update_job_idx(curr_job_idx);
-            std::cerr << "Current job index: " << curr_job_idx << "\n";
             job_t &curr_job = jobs[curr_job_idx];
             try
             {
                 curr_job.estimate_memory_usage();
                 wait_for_starting_permission(curr_job);
+                update_job_idx(curr_job_idx);
                 Extractor ex(curr_job.path.c_str());
                 ex.extract();
                 output_result(curr_job, ex);
@@ -76,8 +101,9 @@ private:
             {
                 std::cerr << tr.what() << "\n";
                 can_continue.store(false);
-                handle_termination(tr, curr_job);
                 requeue_job(curr_job);
+                cleanup_termination(tr, curr_job);
+                // update last_job_index
             }
         }
         stop_working();
@@ -85,16 +111,17 @@ private:
 
     void stop_working()
     {
-        threads_working.fetch_sub(1, std::memory_order_relaxed);
+        ++threads_finished;
         update_threshold();
     }
 
     void wait_for_starting_permission(const job_t &job)
     {
-        while (!can_start(job) || !can_continue.load(std::memory_order_relaxed))
+        while (!can_start(job) || (!can_continue.load(std::memory_order_relaxed) && threads_working.load(std::memory_order_relaxed) != 1))
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
+        ++threads_working;
     }
 
     bool can_start(const job_t &job)
@@ -104,24 +131,30 @@ private:
 
     void update_job_idx(std::uint32_t job_idx)
     {
+        std::cerr << "Current job index: " << job_idx << "\n";
         thread_data[thread_id].job_idx = job_idx;
         std::uint32_t tmp = last_job_idx.load(std::memory_order_relaxed);
         while (job_idx > tmp && !last_job_idx.compare_exchange_weak(tmp, job_idx, std::memory_order_relaxed, std::memory_order_relaxed))
             ;
     }
 
-    void requeue_job(const job_t &job)
+    void requeue_job(job_t &job)
     {
+        if (job.memnbt - mem_max < buffer_per_job)
+        {
+            std::cerr << "Cannot requeue job with path " << job.path << "!\nMemory needed before termination: " << job.memnbt << "\nMaximum amount of memory available: " << mem_max << std::endl;
+            return;
+        }
+        job.memnbt = thread_data[thread_id].peak_mem_usage;
         std::unique_lock<std::mutex> lock(jobs_m);
         jobs.push_back(job);
     }
 
-    void handle_termination(const TerminationRequest &tr, job_t &curr_job)
+    void cleanup_termination(const TerminationRequest &tr, job_t &curr_job)
     {
-        curr_job.memnbt = thread_data[thread_id].peak_mem_usage;
-        thread_data[thread_id].exception_alloc = false;
         thread_data[thread_id].reset();
-        --last_job_idx;
+        thread_data[thread_id].exception_alloc = false;
+        --threads_working;
     }
 
     void finish_job(const job_t &curr_job)
@@ -129,6 +162,7 @@ private:
         adjust_coefficients(curr_job);
         unreserve_memory(curr_job.emn);
         can_continue.store(true);
+        --threads_working;
     }
 
     void output_result(const job_t &j, Extractor &ex)
@@ -157,7 +191,7 @@ private:
             size_t size = std::filesystem::file_size(file_path);
             jobs.push_back(job_t(file_path, size));
         }
-        std::sort(jobs.begin(), jobs.end(), [](job_t j1, job_t j2)
+        std::sort(jobs.begin(), jobs.end(), [](const job_t &j1, const job_t &j2)
                   { return j1.file_size < j2.file_size; });
     }
 

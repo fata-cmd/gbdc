@@ -48,7 +48,7 @@ benchmarks/
 test.sh
 build.sh
 Testing/
-
+data.csv
 # autotools output
 configure
 makefile

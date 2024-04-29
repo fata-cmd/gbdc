@@ -123,7 +123,7 @@ public:
         buffer = new char[buffer_size];
         refill_buffer();
     }
-    StreamBuffer(const char *filename, int hint) : buffer_size(16384), pos(0), end(0), end_of_file(false), filename_(filename) {}
+    StreamBuffer(const char *filename, int hint) : buffer_size(16384), pos(0), end(0), end_of_file(false), filename_(filename), buffer(nullptr) {}
 
     void init()
     {
@@ -149,7 +149,7 @@ public:
     ~StreamBuffer()
     {
         archive_read_free(file);
-        if (buffer != NULL && buffer[0] != '\0')
+        if (buffer != nullptr && buffer[0] != '\0')
             delete[] buffer;
     }
 

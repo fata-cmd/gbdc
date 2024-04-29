@@ -98,11 +98,11 @@ extern "C"
 
     extern thread_local std::uint64_t thread_id;
     extern std::vector<thread_data_t> thread_data;
-    extern std::atomic<std::uint32_t> last_job_idx;
     extern std::function<bool()> cancel_me;
     extern std::uint64_t mem_max;
-    extern std::atomic<uint16_t> threads_waiting;
     extern std::atomic<uint16_t> threads_working;
+    constexpr std::uint64_t buffer_per_job = 1e7;
+
 
     /* returns the currently allocated amount of memory */
     extern size_t malloc_count_current(void);

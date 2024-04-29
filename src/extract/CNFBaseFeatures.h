@@ -173,8 +173,8 @@ class BaseFeatures2 : public IExtractor {
     virtual ~BaseFeatures2() { }
 
     virtual void extract() {
-        StreamBuffer in(filename_);
-
+        StreamBuffer in(filename_, 5);
+        in.init();
         Cl clause;
         while (in.readClause(clause)) {
             vcg_cdegree.push_back(clause.size());
@@ -193,7 +193,8 @@ class BaseFeatures2 : public IExtractor {
         }
 
         // clause graph features
-        StreamBuffer in2(filename_);
+        StreamBuffer in2(filename_,5);
+        in2.init();
         while (in2.readClause(clause)) {
             unsigned degree = 0;
             for (Lit lit : clause) {
