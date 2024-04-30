@@ -17,6 +17,8 @@
 #include <tuple>
 #include <condition_variable>
 
+void debug_msg(const std::string &msg);
+
 struct csv_t
 {
     std::ofstream of;
@@ -59,7 +61,7 @@ private:
     std::atomic<std::uint32_t> threads_finished = 0;
     std::atomic<std::uint32_t> next_job_idx = 0;
     std::atomic<std::uint32_t> thread_id_counter;
-    std::vector<std::atomic<double>> coeffs;
+    std::atomic<size_t> termination_counter = 0;
     std::mutex jobs_m;
 
     void wait_for_completion()
@@ -96,7 +98,7 @@ private:
             }
             catch (const TerminationRequest &tr)
             {
-                std::cerr << tr.what() << "\n";
+                debug_msg(tr.what());
                 requeue_job(curr_job);
                 cleanup_termination(tr, curr_job);
             }
@@ -107,6 +109,16 @@ private:
     void stop_working()
     {
         ++threads_finished;
+    }
+
+    bool can_start(size_t size)
+    {
+        if (can_alloc(size))
+        {
+            thread_data[thread_id].inc_reserved(size);
+            return true;
+        }
+        return false;
     }
 
     void wait_for_starting_permission(const job_t &job)
@@ -120,7 +132,7 @@ private:
 
     void update_job_idx(std::uint32_t job_idx)
     {
-        std::cerr << "Current job index: " << job_idx << "\n";
+        debug_msg("Current job index: " + std::to_string(job_idx) + "\n");
         thread_data[thread_id].job_idx = job_idx;
     }
 
@@ -128,24 +140,28 @@ private:
     {
         if (job.memnbt - mem_max < buffer_per_job)
         {
-            std::cerr << "Cannot requeue job with path " << job.path << "!\nMemory needed before termination: " << job.memnbt << "\nMaximum amount of memory available: " << mem_max << std::endl;
+            debug_msg("Cannot requeue job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(job.memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max));
             return;
         }
-        job.memnbt = thread_data[thread_id].peak_mem_usage;
+        debug_msg("Requeuing job with path " + job.path);
+        job.memnbt = thread_data[thread_id].peak_mem_allocated;
+        ++job.termination_count;
         std::unique_lock<std::mutex> lock(jobs_m);
         jobs.push_back(job);
     }
 
     void cleanup_termination(const TerminationRequest &tr, job_t &curr_job)
     {
-        thread_data[thread_id].reset();
-        --threads_working;
-        termination_ongoing.store(false);
+        finish_job(curr_job);
+        termination_ongoing.unlock();
+        termination_counter.fetch_add(1, std::memory_order_relaxed);
     }
 
     void finish_job(const job_t &curr_job)
     {
-        --threads_working;
+        threads_working.fetch_sub(1, std::memory_order_relaxed);
+        unreserve_memory(thread_data[thread_id].mem_reserved);
+        thread_data[thread_id].reset();
     }
 
     void output_result(const job_t &j, Extractor &ex)
@@ -159,11 +175,10 @@ private:
             result += names[i] + " = " + std::to_string(feats[i]) + "\n";
         }
         std::cerr << "FileSize: " << j.file_size << "\n";
-        std::cerr << result + "\n Current memory usage: " + std::to_string(thread_data[thread_id].mem_usage) +
+        std::cerr << result + "\n Current memory usage: " + std::to_string(thread_data[thread_id].mem_allocated) +
                          "\n Estimated memory usage: " + std::to_string(j.emn) +
-                         "\n Peak memory usage: " + std::to_string(thread_data[thread_id].peak_mem_usage)
+                         "\n Peak memory usage: " + std::to_string(thread_data[thread_id].peak_mem_allocated)
                   << std::endl;
-        thread_data[thread_id].reset();
     }
 
     void init_jobs(const std::vector<std::string> &_hashes)
@@ -201,3 +216,10 @@ public:
         wait_for_completion();
     }
 };
+
+void debug_msg(const std::string &msg)
+{
+#ifndef NDEBUG
+    std::cerr << "[Thread " + std::to_string(thread_id) + "] " + msg << std::endl;
+#endif
+}

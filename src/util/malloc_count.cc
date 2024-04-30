@@ -49,15 +49,9 @@ thread_local std::uint64_t thread_id = SENTINEL_ID;
 std::vector<thread_data_t> thread_data;
 std::atomic<std::uint32_t> last_job_idx;
 std::atomic<uint16_t> threads_working = 0;
-std::atomic<bool> termination_ongoing;
+std::mutex termination_ongoing;
 
 std::uint64_t mem_max = 1ULL << 30;
-
-static const int log_operations = 0; /* <-- set this to 1 for log output */
-static const size_t log_operations_threshold = 1024 * 1024;
-
-/* option to use gcc's intrinsics to do thread-safe statistics operations */
-#define THREAD_SAFE_GCC_INTRINSICS 0
 
 /* to each allocation additional data is added for bookkeeping. due to
  * alignment requirements, we can optionally add more than just one integer. */
@@ -79,97 +73,58 @@ static const size_t sentinel = 0xDEADC0DE;
 #define INIT_HEAP_SIZE 512 * 512
 static char init_heap[INIT_HEAP_SIZE];
 static size_t init_heap_use = 0;
-static const int log_operations_init_heap = 0;
 
 /* output */
 #define PPREFIX "malloc_count ### "
 
-/*****************************************/
-/* run-time memory allocation statistics */
-/*****************************************/
+static std::atomic<size_t> peak = 0, reserved = 0;
+TerminationRequest tr("Terminating job..");
 
-static std::atomic<size_t> peak = 0, curr = 0;
-
-static malloc_count_callback_type callback = NULL;
-static void *callback_cookie = NULL;
 static std::memory_order relaxed = std::memory_order_relaxed;
 
-/* add allocation to statistics */
-static void inc_count(size_t inc)
+static void inc_reserved(size_t inc)
 {
     if (thread_id != SENTINEL_ID)
-        thread_data[thread_id].inc_mem(inc);
-    // if (callback)
-    //     callback(callback_cookie, curr);
+        thread_data[thread_id].inc_allocated(inc);
 }
 
-/* decrement allocation to statistics */
-static void dec_count(size_t dec)
+static void dec_reserved(size_t dec)
 {
     if (thread_id != SENTINEL_ID)
-        thread_data[thread_id].dec_mem(dec);
-    // if (callback)
-    //     callback(callback_cookie, curr);
+    {
+        if (thread_data[thread_id].mem_allocated > thread_data[thread_id].mem_reserved)
+        {
+            reserved.fetch_sub(std::min(dec, thread_data[thread_id].mem_allocated - thread_data[thread_id].mem_reserved), relaxed);
+        }
+        thread_data[thread_id].dec_allocated(dec);
+    }
 }
 
-/* user function to return the currently allocated amount of memory */
-extern size_t malloc_count_current(void)
-{
-    return curr.load(relaxed);
-}
-
-/* user function to return the peak allocation */
-extern size_t malloc_count_peak(void)
-{
-    return peak;
-}
-
-/* user function to reset the peak allocation to current */
-extern void malloc_count_reset_peak(void)
-{
-    peak.store(curr, relaxed);
-}
-
-/* user function which prints current and peak allocation to stderr */
-extern void malloc_count_print_status(void)
-{
-    fprintf(stderr, PPREFIX "current %'lld, peak %'lld\n",
-            (long long)curr.load(), (long long)peak.load());
-}
-
-/* user function to supply a memory profile callback */
-void malloc_count_set_callback(malloc_count_callback_type cb, void *cookie)
-{
-    callback = cb;
-    callback_cookie = cookie;
-}
-
-inline size_t threshold()
+size_t threshold()
 {
     return buffer_per_job * threads_working.load(relaxed);
 }
 
-bool can_start(size_t size){
-    return (curr.load(relaxed) + size) <= (mem_max - threshold());
-}
-
 bool can_alloc(size_t size)
 {
-    if (mem_max - curr.load(relaxed) < threshold())
-        return false;
     bool exchanged = false;
-    size_t _curr = curr.load(relaxed);
-    while ((thread_data[thread_id].exception_alloc || ((_curr + size) <= (mem_max - threshold()))) &&
-           !(exchanged = curr.compare_exchange_weak(_curr, _curr + size, relaxed, relaxed)))
+    auto _reserved = reserved.load(relaxed);
+    while (((_reserved + size + threshold()) <= mem_max) &&
+           !(exchanged = reserved.compare_exchange_weak(_reserved, _reserved + size, relaxed, relaxed)))
         ;
     return exchanged;
 }
 
-void terminate(size_t size)
+void unreserve_memory(size_t size)
 {
+    reserved.fetch_sub(size, relaxed);
+}
+
+void terminate()
+{
+    // exception allocation needed because of malloc call during internal exception allocation
     thread_data[thread_id].exception_alloc = true;
-    throw TerminationRequest("Thread " + std::to_string(thread_id) + " trying to allocate more memory than currently available! \nCurrent: " +
-                             std::to_string(mem_max - std::min(mem_max, curr.load())) + " < Desired: " + std::to_string(size));
+    throw tr;
 }
 
 /****************************************************/
@@ -186,21 +141,23 @@ extern void *malloc(size_t size)
 
     if (real_malloc)
     {
-        /* call read malloc procedure in libc */
-        ret = (*real_malloc)(alignment + size);
-
         if (thread_id != SENTINEL_ID)
         {
-            if (!can_alloc(size))
+            // needed memory has not been previously reserved and is not freely allocatable
+            if (!thread_data[thread_id].exception_alloc &&
+                (thread_data[thread_id].mem_allocated + size) > thread_data[thread_id].mem_reserved)
             {
-                bool tmp = false;
-                if (termination_ongoing.compare_exchange_strong(tmp, true))
-                    terminate(size);
-                else
-                    return malloc(size);
+                while (!can_alloc(thread_data[thread_id].mem_allocated + size - thread_data[thread_id].mem_reserved))
+                {
+                    if (termination_ongoing.try_lock())
+                        terminate();
+                } // FIX COUNTING! MORE MEMORY RESERVED THAN ACTUALLY NEEDED
             }
-            inc_count(size);
+            inc_reserved(size);
         }
+
+        /* call read malloc procedure in libc */
+        ret = (*real_malloc)(alignment + size);
 
         /* prepend allocation size and check sentinel */
         *(size_t *)ret = size;
@@ -255,11 +212,7 @@ extern void free(void *ptr)
     }
 
     size = *(size_t *)ptr;
-    if ((double)size / mem_max > 0.1)
-    {
-        fprintf(stderr, "Freeing more than 10 percent of mem: %lu\n", size);
-    }
-    dec_count(size);
+    dec_reserved(size);
 
     (*real_free)(ptr);
 }
@@ -334,9 +287,9 @@ extern void *realloc(void *ptr, size_t size)
     oldsize = *(size_t *)ptr;
 
     if (oldsize > size)
-        dec_count(oldsize - size);
+        dec_reserved(oldsize - size);
     else
-        inc_count(size - oldsize);
+        inc_reserved(size - oldsize);
 
     newptr = (*real_realloc)(ptr, alignment + size);
 
@@ -378,7 +331,7 @@ static __attribute__((constructor)) void init(void)
 static __attribute__((destructor)) void finish(void)
 {
     fprintf(stderr, PPREFIX "exiting, peak: %'lld, current: %'lld\n",
-            (long long)peak.load(), (long long)curr.load());
+            (long long)peak.load(), (long long)reserved.load());
 }
 
 /*****************************************************************************/

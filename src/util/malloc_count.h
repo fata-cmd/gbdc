@@ -43,14 +43,17 @@ extern "C"
     class TerminationRequest : public std::runtime_error
     {
     public:
-        explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg) {}
+        explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg)
+        {
+        }
     };
 
-    constexpr std::uint64_t buffer_per_job = 1e7;
+    constexpr std::uint64_t buffer_per_job = 1e6;
 
     struct job_t
     {
         std::string path;
+        size_t termination_count = 0;
         size_t file_size;
         size_t emn = 0;                 // estimated memory needed
         size_t memnbt = buffer_per_job; // memory needed before termination
@@ -60,34 +63,46 @@ extern "C"
     struct thread_data_t
     {
         thread_data_t() {}
-        bool exception_alloc = false; // used to pass allocation checks when calling malloc
-        size_t mem_usage = 0;         // currently allocated memory
-        size_t peak_mem_usage = 0;    // peak allocated memory for current job
-        size_t num_allocs = 0;        // number of calls to malloc for current job
-        std::uint32_t job_idx = 0;    // index of current job
+        bool exception_alloc = false;
+        size_t mem_allocated = 0;      // currently allocated memory
+        size_t mem_reserved = 0;       // currently reserved memory
+        size_t peak_mem_allocated = 0; // peak reserved memory for current job
+        size_t num_allocs = 0;         // number of calls to malloc for current job
+        std::uint32_t job_idx = 0;     // index of current job
 
         void set_job_idx(std::uint32_t _job_idx)
         {
             job_idx = _job_idx;
         }
 
-        void inc_mem(size_t size)
+        void inc_allocated(size_t size)
         {
             ++num_allocs;
-            mem_usage += size;
-            peak_mem_usage = std::max(mem_usage, peak_mem_usage);
+            mem_allocated += size;
+            peak_mem_allocated = std::max(mem_allocated, peak_mem_allocated);
         }
 
-        void dec_mem(size_t size)
+        void dec_allocated(size_t size)
         {
-            mem_usage -= size;
+            mem_allocated -= size;
+        }
+
+        void inc_reserved(size_t size)
+        {
+            mem_reserved += size;
+        }
+
+        void dec_reserved(size_t size)
+        {
+            mem_reserved -= std::min(size, mem_reserved);
         }
 
         void reset()
         {
-            peak_mem_usage = 0;
-            num_allocs = 0;
             exception_alloc = false;
+            mem_reserved = 0;
+            peak_mem_allocated = 0;
+            num_allocs = 0;
         }
     };
 
@@ -95,31 +110,12 @@ extern "C"
     extern std::vector<thread_data_t> thread_data;
     extern std::uint64_t mem_max;
     extern std::atomic<uint16_t> threads_working;
-    extern std::atomic<bool> termination_ongoing;
+    extern std::mutex termination_ongoing;
 
-    /* returns the currently allocated amount of memory */
-    extern size_t malloc_count_current(void);
+    /* returns true if memory has been reserved*/
+    extern bool can_alloc(size_t size);
 
-    /* returns the current peak memory allocation */
-    extern size_t malloc_count_peak(void);
-
-    /* resets the peak memory allocation to current */
-    extern void malloc_count_reset_peak(void);
-
-    /* returns true if job can fit into memory*/
-    extern bool can_start(size_t size);
-
-    /* typedef of callback function */
-    typedef void (*malloc_count_callback_type)(void *cookie, size_t current);
-
-    /* supply malloc_count with a callback function that is invoked on each change
-     * of the current allocation. The callback function must not use
-     * malloc()/realloc()/free() or it will go into an endless recursive loop! */
-    extern void malloc_count_set_callback(malloc_count_callback_type cb,
-                                          void *cookie);
-
-    /* user function which prints current and peak allocation to stderr */
-    extern void malloc_count_print_status(void);
+    extern void unreserve_memory(size_t size);
 
 #ifdef __cplusplus
 } /* extern "C" */
