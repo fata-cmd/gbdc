@@ -34,19 +34,19 @@
 #include <stdio.h>
 #include <locale.h>
 #include <dlfcn.h>
-#include <unordered_map>
 #include <thread>
-#include "malloc_count.h"
 #include <functional>
 #include <atomic>
-#include <condition_variable>
 #include <mutex>
+#include "malloc_count.h"
+#include "Util.h"
+#include "ThreadPool.h"
 
 /* user-defined options for output malloc()/free() operations to stderr */
 
 constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
-thread_local std::uint64_t thread_id = SENTINEL_ID;
-std::vector<thread_data_t> thread_data;
+thread_local thread_data_t* tl_data;
+thread_local std::uint64_t tl_id = SENTINEL_ID;
 std::atomic<std::uint32_t> last_job_idx;
 std::atomic<uint16_t> threads_working = 0;
 std::mutex termination_ongoing;
@@ -82,22 +82,15 @@ TerminationRequest tr("Terminating job..");
 
 static std::memory_order relaxed = std::memory_order_relaxed;
 
-static void inc_reserved(size_t inc)
+static void inc_allocated(size_t size)
 {
-    if (thread_id != SENTINEL_ID)
-        thread_data[thread_id].inc_allocated(inc);
+    tl_data->inc_allocated(size);
 }
 
-static void dec_reserved(size_t dec)
+static void dec_allocated(size_t size)
 {
-    if (thread_id != SENTINEL_ID)
-    {
-        if (thread_data[thread_id].mem_allocated > thread_data[thread_id].mem_reserved)
-        {
-            reserved.fetch_sub(std::min(dec, thread_data[thread_id].mem_allocated - thread_data[thread_id].mem_reserved), relaxed);
-        }
-        thread_data[thread_id].dec_allocated(dec);
-    }
+    tl_data->dec_allocated(size);
+    unreserve_memory(std::min(size, tl_data->mem_allocated - tl_data->mem_reserved));
 }
 
 size_t threshold()
@@ -107,6 +100,8 @@ size_t threshold()
 
 bool can_alloc(size_t size)
 {
+    if (size == 0UL)
+        return true;
     bool exchanged = false;
     auto _reserved = reserved.load(relaxed);
     while (((_reserved + size + threshold()) <= mem_max) &&
@@ -122,8 +117,8 @@ void unreserve_memory(size_t size)
 
 void terminate()
 {
-    // exception allocation needed because of malloc call during internal exception allocation
-    thread_data[thread_id].exception_alloc = true;
+    // exception allocation needed because of malloc call during libc exception allocation
+    tl_data->exception_alloc = true;
     throw tr;
 }
 
@@ -141,19 +136,18 @@ extern void *malloc(size_t size)
 
     if (real_malloc)
     {
-        if (thread_id != SENTINEL_ID)
+        if (tl_id != SENTINEL_ID)
         {
             // needed memory has not been previously reserved and is not freely allocatable
-            if (!thread_data[thread_id].exception_alloc &&
-                (thread_data[thread_id].mem_allocated + size) > thread_data[thread_id].mem_reserved)
+            if (!tl_data->exception_alloc)
             {
-                while (!can_alloc(thread_data[thread_id].mem_allocated + size - thread_data[thread_id].mem_reserved))
+                while (!can_alloc(tl_data->mem_needed(size)))
                 {
                     if (termination_ongoing.try_lock())
                         terminate();
-                } // FIX COUNTING! MORE MEMORY RESERVED THAN ACTUALLY NEEDED
+                }
             }
-            inc_reserved(size);
+            inc_allocated(size);
         }
 
         /* call read malloc procedure in libc */
@@ -212,7 +206,8 @@ extern void free(void *ptr)
     }
 
     size = *(size_t *)ptr;
-    dec_reserved(size);
+    if (tl_id != SENTINEL_ID)
+        dec_allocated(size);
 
     (*real_free)(ptr);
 }
@@ -286,10 +281,13 @@ extern void *realloc(void *ptr, size_t size)
 
     oldsize = *(size_t *)ptr;
 
-    if (oldsize > size)
-        dec_reserved(oldsize - size);
-    else
-        inc_reserved(size - oldsize);
+    if (tl_id != SENTINEL_ID)
+    {
+        if (oldsize > size)
+            dec_allocated(oldsize - size);
+        else
+            inc_allocated(size - oldsize);
+    }
 
     newptr = (*real_realloc)(ptr, alignment + size);
 

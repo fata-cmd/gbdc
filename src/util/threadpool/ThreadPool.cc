@@ -1,14 +1,8 @@
-#pragma once
-
 #include <string>
 #include <algorithm>
 #include <queue>
 #include <thread>
 #include <filesystem>
-#include <dlfcn.h>
-#include <stdio.h>
-#include <unordered_map>
-#include "src/extract/IExtractor.h"
 #include "nadeau.h"
 #include "malloc_count.h"
 #include <iostream>
@@ -16,40 +10,19 @@
 #include <atomic>
 #include <tuple>
 #include <condition_variable>
+#include "ThreadPool.h"
+#include "Util.h"
+#include "malloc_count.h"
+
+thread_local thread_data_t* tl_data;
+thread_local std::uint64_t tl_id = SENTINEL_ID;
+
+std::atomic<uint16_t> threads_working = 0;
+std::mutex termination_ongoing;
+
+std::uint64_t mem_max = 1ULL << 30;
 
 void debug_msg(const std::string &msg);
-
-struct csv_t
-{
-    std::ofstream of;
-    std::string s = "";
-    csv_t(const std::string &filename) : of(filename)
-    {
-        std::ofstream file(filename);
-        if (!file.is_open())
-        {
-            std::cerr << "Error opening file " << filename << std::endl;
-            return;
-        }
-        file << "Time,Memory,Jobs" << std::endl;
-    }
-
-    void write_to_file(std::initializer_list<size_t> data)
-    {
-        for (const auto &d : data)
-        {
-            s.append(std::to_string(d) + ",");
-        }
-        s.pop_back();
-        of << s << "\n";
-        s.clear();
-    }
-
-    void close_file()
-    {
-        of.close();
-    }
-};
 
 template <typename Extractor>
 class ThreadPool
@@ -58,6 +31,7 @@ private:
     size_t jobs_max;
     std::vector<job_t> jobs;
     std::vector<std::thread> threads;
+    std::vector<thread_data_t> thread_data;
     std::atomic<std::uint32_t> threads_finished = 0;
     std::atomic<std::uint32_t> next_job_idx = 0;
     std::atomic<std::uint32_t> thread_id_counter;
@@ -82,7 +56,8 @@ private:
 
     void work()
     {
-        thread_id = thread_id_counter.fetch_add(1, std::memory_order_relaxed);
+        tl_id = thread_id_counter.fetch_add(1, std::memory_order_relaxed);
+        tl_data = &thread_data[tl_id];
         std::uint32_t curr_job_idx;
         while ((curr_job_idx = next_job_idx.fetch_add(1, std::memory_order_relaxed)) < jobs.size())
         {
@@ -115,7 +90,7 @@ private:
     {
         if (can_alloc(size))
         {
-            thread_data[thread_id].inc_reserved(size);
+            tl_data->inc_reserved(size);
             return true;
         }
         return false;
@@ -133,7 +108,7 @@ private:
     void update_job_idx(std::uint32_t job_idx)
     {
         debug_msg("Current job index: " + std::to_string(job_idx) + "\n");
-        thread_data[thread_id].job_idx = job_idx;
+        tl_data->job_idx = job_idx;
     }
 
     void requeue_job(job_t &job)
@@ -144,7 +119,7 @@ private:
             return;
         }
         debug_msg("Requeuing job with path " + job.path);
-        job.memnbt = thread_data[thread_id].peak_mem_allocated;
+        job.memnbt = tl_data->peak_mem_allocated;
         ++job.termination_count;
         std::unique_lock<std::mutex> lock(jobs_m);
         jobs.push_back(job);
@@ -160,8 +135,8 @@ private:
     void finish_job(const job_t &curr_job)
     {
         threads_working.fetch_sub(1, std::memory_order_relaxed);
-        unreserve_memory(thread_data[thread_id].mem_reserved);
-        thread_data[thread_id].reset();
+        unreserve_memory(tl_data->mem_reserved);
+        tl_data->reset();
     }
 
     void output_result(const job_t &j, Extractor &ex)
@@ -175,9 +150,9 @@ private:
             result += names[i] + " = " + std::to_string(feats[i]) + "\n";
         }
         std::cerr << "FileSize: " << j.file_size << "\n";
-        std::cerr << result + "\n Current memory usage: " + std::to_string(thread_data[thread_id].mem_allocated) +
+        std::cerr << result + "\n Current memory usage: " + std::to_string(tl_data->mem_allocated) +
                          "\n Estimated memory usage: " + std::to_string(j.emn) +
-                         "\n Peak memory usage: " + std::to_string(thread_data[thread_id].peak_mem_allocated)
+                         "\n Peak memory usage: " + std::to_string(tl_data->peak_mem_allocated)
                   << std::endl;
     }
 
@@ -220,6 +195,6 @@ public:
 void debug_msg(const std::string &msg)
 {
 #ifndef NDEBUG
-    std::cerr << "[Thread " + std::to_string(thread_id) + "] " + msg << std::endl;
+    std::cerr << "[Thread " + std::to_string(tl_id) + "] " + msg << std::endl;
 #endif
 }
