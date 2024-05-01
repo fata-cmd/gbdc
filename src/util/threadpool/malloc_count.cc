@@ -38,20 +38,8 @@
 #include <functional>
 #include <atomic>
 #include <mutex>
-#include "malloc_count.h"
 #include "Util.h"
 #include "ThreadPool.h"
-
-/* user-defined options for output malloc()/free() operations to stderr */
-
-constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
-thread_local thread_data_t* tl_data;
-thread_local std::uint64_t tl_id = SENTINEL_ID;
-std::atomic<std::uint32_t> last_job_idx;
-std::atomic<uint16_t> threads_working = 0;
-std::mutex termination_ongoing;
-
-std::uint64_t mem_max = 1ULL << 30;
 
 /* to each allocation additional data is added for bookkeeping. due to
  * alignment requirements, we can optionally add more than just one integer. */

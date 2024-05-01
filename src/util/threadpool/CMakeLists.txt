@@ -1,6 +1,7 @@
-add_library(MallocCount malloc_count.cc)
-target_include_directories(MallocCount SYSTEM PUBLIC .)
-target_link_libraries(MallocCount PUBLIC dl)
+# add_library(MallocCount malloc_count.cc)
+# target_include_directories(MallocCount SYSTEM PUBLIC .)
+# target_link_libraries(MallocCount PUBLIC dl)
 
-add_library(ThreadPool ThreadPool.cc)
-target_include_directories(ThreadPool SYSTEM PUBLIC .)
+message("BUILDING THREADPOOL")
+add_library(threadpool ThreadPool.cc malloc_count.cc)
+target_include_directories(threadpool SYSTEM PUBLIC .)

@@ -25,8 +25,20 @@ public:
         write_to_file(columns);
     }
 
+    template <template<typename> class Container>
+    void write_to_file(Container<std::string> data)
+    {
+        for (const auto &d : data)
+        {
+            s.append(d + ",");
+        }
+        s.pop_back();
+        of << s << "\n";
+        s.clear();
+    }
+
     template <typename Data>
-    void write_to_file(std::initializer_list<Data> data)
+    void write_to_file(Data data)
     {
         for (const auto &d : data)
         {
@@ -73,6 +85,10 @@ struct thread_data_t
     void dec_allocated(size_t size)
     {
         mem_allocated -= size;
+    }
+
+    void inc_reserved(size_t size){
+        mem_reserved += size;
     }
 
     void dec_reserved(size_t size)

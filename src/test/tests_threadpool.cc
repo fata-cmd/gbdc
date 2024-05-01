@@ -7,7 +7,7 @@
 
 #include "src/test/Util.h"
 #include "src/extract/CNFBaseFeatures.h"
-#include "src/util/ThreadPool.h"
+#include "src/util/threadpool/ThreadPool.h"
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
