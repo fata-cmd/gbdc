@@ -12,6 +12,14 @@
 #include "ThreadPool.h"
 #include "Util.h"
 
+thread_local thread_data_t *tl_data;
+thread_local std::uint64_t tl_id = SENTINEL_ID;
+
+std::atomic<uint16_t> threads_working = 0;
+std::mutex termination_ongoing;
+
+std::uint64_t mem_max = 1ULL << 30;
+
 template <typename Extractor>
 void ThreadPool<Extractor>::wait_for_completion()
 {
@@ -162,12 +170,10 @@ void ThreadPool<Extractor>::init_threads(std::uint32_t num_threads)
         threads.emplace_back(std::thread(&ThreadPool::work, this));
     }
 }
-template <typename Extractor>
-ThreadPool<Extractor>::ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
+
+void debug_msg(const std::string &msg)
 {
-    mem_max = _mem_max;
-    jobs_max = _jobs_max;
-    init_jobs(_hashes);
-    init_threads(_jobs_max);
-    wait_for_completion();
+#ifndef NDEBUG
+    std::cerr << "[Thread " + std::to_string(tl_id) + "] " + msg << std::endl;
+#endif
 }

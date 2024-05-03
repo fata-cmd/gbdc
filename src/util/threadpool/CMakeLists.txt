@@ -3,5 +3,5 @@
 # target_link_libraries(MallocCount PUBLIC dl)
 
 message("BUILDING THREADPOOL")
-add_library(threadpool ThreadPool.cc malloc_count.cc)
+add_library(threadpool SHARED ThreadPool.cc malloc_count.cc)
 target_include_directories(threadpool SYSTEM PUBLIC .)

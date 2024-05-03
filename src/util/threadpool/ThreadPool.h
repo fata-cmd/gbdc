@@ -8,16 +8,16 @@
 #include <atomic>
 #include "Util.h"
 
-constexpr std::uint64_t buffer_per_job = 1e7;
-constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
+inline constexpr std::uint64_t buffer_per_job = 1e7;
+inline constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
 
-thread_local thread_data_t *tl_data;
-thread_local std::uint64_t tl_id = SENTINEL_ID;
+extern thread_local thread_data_t *tl_data;
+extern thread_local std::uint64_t tl_id;
 
-std::atomic<uint16_t> threads_working = 0;
-std::mutex termination_ongoing;
+extern std::atomic<uint16_t> threads_working;
+extern std::mutex termination_ongoing;
 
-std::uint64_t mem_max = 1ULL << 30;
+extern std::uint64_t mem_max;
 
 /* returns true if memory has been reserved*/
 extern bool can_alloc(size_t size);
@@ -60,12 +60,15 @@ private:
     void init_threads(std::uint32_t num_threads);
 
 public:
-    explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max);
+    // explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
+    ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
+    {
+        mem_max = _mem_max;
+        jobs_max = _jobs_max;
+        init_jobs(_hashes);
+        init_threads(_jobs_max);
+        wait_for_completion();
+    }
 };
 
-void debug_msg(const std::string &msg)
-{
-#ifndef NDEBUG
-    std::cerr << "[Thread " + std::to_string(tl_id) + "] " + msg << std::endl;
-#endif
-}
+extern void debug_msg(const std::string &msg);
