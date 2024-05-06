@@ -77,11 +77,7 @@ static void inc_allocated(size_t size)
 
 static void dec_allocated(size_t size)
 {
-    if (tl_data->mem_allocated > tl_data->mem_reserved)
-    {
-        // reserved should not go below initial value
-        unreserve_memory(std::min(tl_data->mem_allocated - tl_data->mem_reserved, size));
-    }
+    unreserve_memory(tl_data->rmem_not_needed(size));
     tl_data->dec_allocated(size);
 }
 
@@ -133,7 +129,7 @@ extern void *malloc(size_t size)
             // needed memory has not been previously reserved and is not freely allocatable
             if (!tl_data->exception_alloc)
             {
-                while (!can_alloc(tl_data->mem_needed(size)))
+                while (!can_alloc(tl_data->rmem_needed(size)))
                 {
                     if (termination_ongoing.try_lock())
                         terminate();
