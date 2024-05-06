@@ -1,16 +1,21 @@
+#include "ThreadPool.h"
+#include "Util.h"
 #include <string>
 #include <algorithm>
-#include <queue>
 #include <thread>
-#include <filesystem>
 #include "nadeau.h"
 #include <iostream>
 #include <mutex>
 #include <atomic>
-#include <tuple>
-#include <condition_variable>
-#include "ThreadPool.h"
-#include "Util.h"
+#include "../../extract/CNFBaseFeatures.h"
+#include "../../extract/CNFGateFeatures.h"
+#include "../../extract/OPBBaseFeatures.h"
+#include "../../extract/WCNFBaseFeatures.h"
+
+template class ThreadPool<CNF::BaseFeatures>;
+template class ThreadPool<WCNF::BaseFeatures>;
+template class ThreadPool<OPB::BaseFeatures>;
+template class ThreadPool<CNFGateFeatures>;
 
 thread_local thread_data_t *tl_data;
 thread_local std::uint64_t tl_id = SENTINEL_ID;
@@ -23,7 +28,7 @@ std::uint64_t mem_max = 1ULL << 30;
 template <typename Extractor>
 void ThreadPool<Extractor>::wait_for_completion()
 {
-    csv_t csv("data.csv");
+    csv_t csv("data.csv", {"time, mem, jobs"});
     size_t begin = std::chrono::steady_clock::now().time_since_epoch().count();
     size_t tp;
     while (threads_finished.load(std::memory_order_relaxed) != threads.size())
@@ -169,6 +174,17 @@ void ThreadPool<Extractor>::init_threads(std::uint32_t num_threads)
         thread_data.emplace_back();
         threads.emplace_back(std::thread(&ThreadPool::work, this));
     }
+}
+
+template <typename Extractor>
+ThreadPool<Extractor>::ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
+{
+
+    mem_max = _mem_max;
+    jobs_max = _jobs_max;
+    init_jobs(_hashes);
+    init_threads(_jobs_max);
+    wait_for_completion();
 }
 
 void debug_msg(const std::string &msg)

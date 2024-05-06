@@ -23,7 +23,7 @@ TEST_CASE("Threadpool")
         {
             paths.push_back(entry.path());
         }
-        ThreadPool<CNF::BaseFeatures>tp(paths,1UL << 25,1U);
+        ThreadPool<CNF::BaseFeatures>(paths,1UL << 25,1U);
         // ThreadPool<CNF::BaseFeatures>();
         CHECK_EQ(1, 1);
     }

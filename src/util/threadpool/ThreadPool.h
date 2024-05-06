@@ -61,14 +61,7 @@ private:
 
 public:
     // explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
-    ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
-    {
-        mem_max = _mem_max;
-        jobs_max = _jobs_max;
-        init_jobs(_hashes);
-        init_threads(_jobs_max);
-        wait_for_completion();
-    }
+    explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max);
 };
 
 extern void debug_msg(const std::string &msg);
