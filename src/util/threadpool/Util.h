@@ -25,7 +25,7 @@ public:
         write_to_file(columns);
     }
 
-    template <template<typename> class Container>
+    template <template <typename> class Container>
     void write_to_file(Container<std::string> data)
     {
         for (const auto &d : data)
@@ -87,7 +87,8 @@ struct thread_data_t
         mem_allocated -= size;
     }
 
-    void inc_reserved(size_t size){
+    void inc_reserved(size_t size)
+    {
         mem_reserved += size;
     }
 
@@ -106,10 +107,17 @@ struct thread_data_t
 
     size_t mem_needed(size_t size)
     {
-        size_t freely_allocatable;
-        if ((freely_allocatable = mem_reserved < mem_allocated ? 0UL : mem_reserved - mem_allocated))
+        if (mem_reserved < mem_allocated)
         {
-            return size < freely_allocatable ? 0UL : size - freely_allocatable;
+            return mem_reserved + size - std::min(mem_reserved + size, mem_allocated);
+            // if (mem_reserved + size < mem_allocated)
+            // {
+            //     return 0UL;
+            // }
+            // else
+            // {
+            //     return mem_reserved + size - mem_allocated;
+            // }
         }
         return size;
     }

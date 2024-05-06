@@ -77,8 +77,12 @@ static void inc_allocated(size_t size)
 
 static void dec_allocated(size_t size)
 {
+    if (tl_data->mem_allocated > tl_data->mem_reserved)
+    {
+        // reserved should not go below initial value
+        unreserve_memory(std::min(tl_data->mem_allocated - tl_data->mem_reserved, size));
+    }
     tl_data->dec_allocated(size);
-    unreserve_memory(std::min(size, tl_data->mem_allocated - tl_data->mem_reserved));
 }
 
 size_t threshold()

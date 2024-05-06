@@ -21,15 +21,13 @@ extern std::uint64_t mem_max;
 
 /* returns true if memory has been reserved*/
 extern bool can_alloc(size_t size);
-
 extern void unreserve_memory(size_t size);
+
 
 class TerminationRequest : public std::runtime_error
 {
 public:
-    explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg)
-    {
-    }
+    explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg){}
 };
 
 template <typename Extractor>
@@ -60,7 +58,6 @@ private:
     void init_threads(std::uint32_t num_threads);
 
 public:
-    // explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max)
     explicit ThreadPool(std::vector<std::string> _hashes, std::uint64_t _mem_max, std::uint32_t _jobs_max);
 };
 
