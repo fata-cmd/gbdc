@@ -35,6 +35,7 @@
 #include <locale.h>
 #include <dlfcn.h>
 #include <thread>
+#include <cassert>
 #include <functional>
 #include <atomic>
 #include <mutex>
@@ -66,7 +67,6 @@ static size_t init_heap_use = 0;
 #define PPREFIX "malloc_count ### "
 
 static std::atomic<size_t> peak = 0, reserved = 0;
-TerminationRequest tr("Terminating job..");
 
 static std::memory_order relaxed = std::memory_order_relaxed;
 
@@ -83,7 +83,8 @@ static void dec_allocated(size_t size)
 
 size_t threshold()
 {
-    return buffer_per_job * threads_working.load(relaxed);
+    return 0UL;
+    //    return buffer_per_job * threads_working.load(relaxed);
 }
 
 bool can_alloc(size_t size)
@@ -92,7 +93,7 @@ bool can_alloc(size_t size)
         return true;
     bool exchanged = false;
     auto _reserved = reserved.load(relaxed);
-    while (((_reserved + size + threshold()) <= mem_max) &&
+    while ((tl_data->exception_alloc || ((_reserved + size + threshold()) <= mem_max)) &&
            !(exchanged = reserved.compare_exchange_weak(_reserved, _reserved + size, relaxed, relaxed)))
         ;
     return exchanged;
@@ -100,6 +101,7 @@ bool can_alloc(size_t size)
 
 void unreserve_memory(size_t size)
 {
+    // assert((size > 0));
     reserved.fetch_sub(size, relaxed);
 }
 
@@ -107,7 +109,7 @@ void terminate()
 {
     // exception allocation needed because of malloc call during libc exception allocation
     tl_data->exception_alloc = true;
-    throw tr;
+    throw TerminationRequest("Terminating!\nCurrently reserved memory: " + std::to_string(reserved.load()) + "\nAllocated memory: " + std::to_string(tl_data->mem_allocated));
 }
 
 /****************************************************/
@@ -126,14 +128,10 @@ extern void *malloc(size_t size)
     {
         if (tl_id != SENTINEL_ID)
         {
-            // needed memory has not been previously reserved and is not freely allocatable
-            if (!tl_data->exception_alloc)
+            while (!can_alloc(tl_data->rmem_needed(size)))
             {
-                while (!can_alloc(tl_data->rmem_needed(size)))
-                {
-                    if (termination_ongoing.try_lock())
-                        terminate();
-                }
+                if (termination_ongoing.try_lock())
+                    terminate();
             }
             inc_allocated(size);
         }

@@ -68,12 +68,18 @@ struct job_t
 struct thread_data_t
 {
     thread_data_t() {}
+    /* needed to pass allocation checks in case of required termination of job */
     bool exception_alloc = false;
-    size_t mem_allocated = 0;      // currently allocated memory
-    size_t mem_reserved = 0;       // currently reserved memory
-    size_t peak_mem_allocated = 0; // peak reserved memory for current job
-    size_t num_allocs = 0;         // number of calls to malloc for current job
-    std::uint32_t job_idx = 0;     // index of current job
+    /* currently allocated memory */
+    size_t mem_allocated = 0;
+    /* currently reserved memory */
+    size_t mem_reserved = 0;
+    /* peak allocated memory for current job */
+    size_t peak_mem_allocated = 0;
+    /* number of calls to malloc for current job */
+    size_t num_allocs = 0;
+    /* index of current job */
+    std::uint32_t job_idx = 0;
 
     void inc_allocated(const size_t size)
     {
@@ -92,34 +98,35 @@ struct thread_data_t
         mem_reserved += size;
     }
 
-    void dec_reserved(const size_t size)
+    size_t unreserve_memory()
     {
-        mem_reserved -= std::min(size, mem_reserved);
+        size_t tmp = mem_reserved;
+        mem_reserved = 0UL;
+        return tmp;
     }
 
     void reset()
     {
         exception_alloc = false;
-        mem_reserved = 0;
         peak_mem_allocated = 0;
         num_allocs = 0;
     }
-    
+
     size_t rmem_needed(const size_t size) const
     {
-        //if reserved memory is not sufficient to harbor allocation size, 
-        //additional reserved memory is needed
+        // if reserved memory is not sufficient to harbor allocation size,
+        // additional reserved memory is needed
         if (mem_reserved > mem_allocated)
         {
             return std::max(mem_reserved, mem_allocated + size) - mem_reserved;
         }
-        //reserved memory is fully used, require allocation of full size
+        // reserved memory is fully used, require reservation of full size
         return size;
     }
-    
+
     size_t rmem_not_needed(const size_t size) const
     {
-        //can return allocated memory down to initially reserved amount
+        // can return allocated memory down to initially reserved amount
         if (mem_allocated > mem_reserved)
         {
             return std::min(mem_allocated - mem_reserved, size);
