@@ -71,10 +71,7 @@ void ThreadPool<Extractor>::work()
 template <typename Extractor>
 bool ThreadPool<Extractor>::next_job()
 {
-    do
-    {
-        tl_data->job_idx = next_job_idx.fetch_add(1, std::memory_order_relaxed);
-    } while (jobs[tl_data->job_idx].memnbt >= mem_max - 5e6);
+    tl_data->job_idx = next_job_idx.fetch_add(1, std::memory_order_relaxed);
     debug_msg("New job index: " + std::to_string(tl_data->job_idx) + "\n");
     return tl_data->job_idx < jobs.size();
 }
@@ -116,7 +113,7 @@ template <typename Extractor>
 void ThreadPool<Extractor>::requeue_job()
 {
     job_t &job = jobs[tl_data->job_idx];
-    if (job.memnbt - mem_max < buffer_per_job)
+    if (job.memnbt < mem_max - buffer_per_job)
     {
         debug_msg("Cannot requeue job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(job.memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max));
         return;
