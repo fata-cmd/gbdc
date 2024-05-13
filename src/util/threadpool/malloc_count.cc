@@ -58,6 +58,8 @@ static realloc_type real_realloc = NULL;
 /* a sentinel value prefixed to each allocation */
 static const size_t sentinel = 0xDEADC0DE;
 
+static const size_t overhead = alignment + sizeof(size_t); // 24 bytes overhead per allocation 
+
 /* a simple memory heap for allocations prior to dlsym loading */
 #define INIT_HEAP_SIZE 512 * 512
 static char init_heap[INIT_HEAP_SIZE];
@@ -66,9 +68,7 @@ static size_t init_heap_use = 0;
 /* output */
 #define PPREFIX "malloc_count ### "
 
-static std::atomic<size_t> peak = 0, reserved = 0;
-
-static std::memory_order relaxed = std::memory_order_relaxed;
+std::atomic<size_t> peak = 0, reserved = 0;
 
 static void inc_allocated(size_t size)
 {
@@ -89,7 +89,7 @@ size_t threshold()
 
 bool can_alloc(size_t size)
 {
-    if (size == 0UL)
+    if (size <= alignment)
         return true;
     bool exchanged = false;
     auto _reserved = reserved.load(relaxed);
@@ -101,7 +101,6 @@ bool can_alloc(size_t size)
 
 void unreserve_memory(size_t size)
 {
-    // assert((size > 0));
     reserved.fetch_sub(size, relaxed);
 }
 
@@ -109,7 +108,7 @@ void terminate()
 {
     // exception allocation needed because of malloc call during libc exception allocation
     tl_data->exception_alloc = true;
-    throw TerminationRequest("Terminating!\nCurrently reserved memory: " + std::to_string(reserved.load()) + "\nAllocated memory: " + std::to_string(tl_data->mem_allocated));
+    throw TerminationRequest("Terminating!\nCurrently reserved memory: " + std::to_string(reserved.load()) + "\n");
 }
 
 /****************************************************/
@@ -128,19 +127,19 @@ extern void *malloc(size_t size)
     {
         if (tl_id != SENTINEL_ID)
         {
-            while (!can_alloc(tl_data->rmem_needed(size)))
+            while (!can_alloc(tl_data->rmem_needed(size + alignment)))
             {
                 if (termination_ongoing.try_lock())
                     terminate();
             }
-            inc_allocated(size);
+            inc_allocated(size + alignment);
         }
 
         /* call read malloc procedure in libc */
-        ret = (*real_malloc)(alignment + size);
+        ret = (*real_malloc)(size + alignment);
 
         /* prepend allocation size and check sentinel */
-        *(size_t *)ret = size;
+        *(size_t *)ret = size + alignment;
         *(size_t *)((char *)ret + alignment - sizeof(size_t)) = sentinel;
 
         return (char *)ret + alignment;
@@ -269,15 +268,15 @@ extern void *realloc(void *ptr, size_t size)
 
     if (tl_id != SENTINEL_ID)
     {
-        if (oldsize > size)
-            dec_allocated(oldsize - size);
+        if (oldsize > (size + alignment))
+            dec_allocated(oldsize - (size + alignment));
         else
-            inc_allocated(size - oldsize);
+            inc_allocated((size + alignment) - oldsize);
     }
 
     newptr = (*real_realloc)(ptr, alignment + size);
 
-    *(size_t *)newptr = size;
+    *(size_t *)newptr = size + alignment;
 
     return (char *)newptr + alignment;
 }

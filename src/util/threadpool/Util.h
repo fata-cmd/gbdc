@@ -25,8 +25,7 @@ public:
         write_to_file(columns);
     }
 
-    template <template <typename> class Container>
-    void write_to_file(Container<std::string> data)
+    void write_to_file(std::initializer_list<std::string> data)
     {
         for (const auto &d : data)
         {
@@ -38,7 +37,18 @@ public:
     }
 
     template <typename Data>
-    void write_to_file(Data data)
+    void write_to_file(Data&& data)
+    {
+        for (const auto &d : data)
+        {
+            s.append(std::to_string(d) + ",");
+        }
+        s.pop_back();
+        of << s << "\n";
+        s.clear();
+    }
+
+    void write_to_file(std::initializer_list<size_t> data)
     {
         for (const auto &d : data)
         {
@@ -63,6 +73,10 @@ struct job_t
     size_t file_size;
     size_t memnbt; // memory needed before termination
     job_t(std::string _path, size_t _file_size, size_t buffer_per_job = 0) : path(_path), file_size(_file_size), memnbt(buffer_per_job) {}
+    void terminate(size_t _memnbt){
+        memnbt = _memnbt;
+        ++termination_count;
+    }
 };
 
 struct thread_data_t
@@ -71,15 +85,15 @@ struct thread_data_t
     /* needed to pass allocation checks in case of required termination of job */
     bool exception_alloc = false;
     /* currently allocated memory */
-    size_t mem_allocated = 0;
+    size_t mem_allocated = 0UL;
     /* currently reserved memory */
-    size_t mem_reserved = 0;
+    size_t mem_reserved = 0UL;
     /* peak allocated memory for current job */
-    size_t peak_mem_allocated = 0;
+    size_t peak_mem_allocated = 0UL;
     /* number of calls to malloc for current job */
-    size_t num_allocs = 0;
+    size_t num_allocs = 0UL;
     /* index of current job */
-    std::uint32_t job_idx = 0;
+    std::uint32_t job_idx = 0U;
 
     void inc_allocated(const size_t size)
     {
@@ -93,44 +107,35 @@ struct thread_data_t
         mem_allocated -= size;
     }
 
-    void inc_reserved(const size_t size)
+    void set_reserved(const size_t size)
     {
-        mem_reserved += size;
+        mem_reserved = size;
     }
 
     size_t unreserve_memory()
     {
         size_t tmp = mem_reserved;
         mem_reserved = 0UL;
-        return tmp;
+        return tmp < mem_allocated ? 0UL : tmp - mem_allocated;
     }
 
     void reset()
     {
         exception_alloc = false;
-        peak_mem_allocated = 0;
-        num_allocs = 0;
+        peak_mem_allocated = 0UL;
+        num_allocs = 0UL;
     }
 
     size_t rmem_needed(const size_t size) const
     {
         // if reserved memory is not sufficient to harbor allocation size,
         // additional reserved memory is needed
-        if (mem_reserved > mem_allocated)
-        {
-            return std::max(mem_reserved, mem_allocated + size) - mem_reserved;
-        }
-        // reserved memory is fully used, require reservation of full size
-        return size;
+        return mem_reserved > mem_allocated ? std::max(mem_reserved, mem_allocated + size) - mem_reserved : size;
     }
 
     size_t rmem_not_needed(const size_t size) const
     {
         // can return allocated memory down to initially reserved amount
-        if (mem_allocated > mem_reserved)
-        {
-            return std::min(mem_allocated - mem_reserved, size);
-        }
-        return 0UL;
+        return mem_allocated > mem_reserved ? std::min(mem_allocated - mem_reserved, size) : 0UL;
     }
 };

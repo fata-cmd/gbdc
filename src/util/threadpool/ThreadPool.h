@@ -8,16 +8,17 @@
 #include <atomic>
 #include "Util.h"
 
-inline constexpr std::uint64_t buffer_per_job = 1e7;
+inline constexpr std::uint64_t buffer_per_job = 0;// 1e7;
 inline constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
+inline constexpr std::memory_order relaxed = std::memory_order_relaxed;
 
 extern thread_local thread_data_t *tl_data;
 extern thread_local std::uint64_t tl_id;
 
+extern std::size_t mem_max;
+extern std::atomic<size_t> peak, reserved;
 extern std::atomic<uint16_t> threads_working;
 extern std::mutex termination_ongoing;
-
-extern std::uint64_t mem_max;
 
 /**
  * @brief Determines whether the requested amount of memory can be allocated or not,
