@@ -106,7 +106,7 @@ class BaseFeatures1 : public IExtractor {
             }
             
             for (Lit lit : clause) {
-                if (lit.var() > n_vars) {
+                if (static_cast<unsigned>(lit.var()) > n_vars) {
                     n_vars = lit.var();
                     variable_horn.resize(n_vars + 1);
                     variable_inv_horn.resize(n_vars + 1);
@@ -268,14 +268,14 @@ class BaseFeatures2 : public IExtractor {
 
             for (Lit lit : clause) {
                 // resize vectors if necessary
-                if (lit.var() > n_vars) {
+                if (static_cast<unsigned>(lit.var()) > n_vars) {
                     n_vars = lit.var();
                     vcg_vdegree.resize(n_vars + 1);
                     vg_degree.resize(n_vars + 1);
                 }
 
                 // count variable occurrences (only for hard clauses)
-                if (!top && !weight || weight >= top) {
+                if ((!top && !weight) || weight >= top) {
                     ++vcg_vdegree[lit.var()];
                     vg_degree[lit.var()] += clause.size();
                 }

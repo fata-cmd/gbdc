@@ -103,7 +103,7 @@ class StreamBuffer
     }
 
 public:
-    explicit StreamBuffer(const char *filename) : buffer_size(16384), pos(0), end(0), end_of_file(false), filename_(filename)
+    explicit StreamBuffer(const char *filename) : buffer_size(16384), buffer(nullptr), pos(0), end(0), end_of_file(false), filename_(filename)
     {
         file = archive_read_new();
         archive_read_support_filter_all(file);
@@ -123,7 +123,7 @@ public:
         buffer = new char[buffer_size];
         refill_buffer();
     }
-    StreamBuffer(const char *filename, int hint) : buffer_size(16384), pos(0), end(0), end_of_file(false), filename_(filename), buffer(nullptr) {}
+    StreamBuffer(const char *filename, int hint) : buffer_size(16384), buffer(nullptr), pos(0), end(0), end_of_file(false), filename_(filename) {}
 
     void init()
     {

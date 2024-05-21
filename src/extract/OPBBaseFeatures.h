@@ -191,14 +191,14 @@ class BaseFeatures : public IExtractor {
                 obj_max_val = obj.maxVal();
                 obj_min_val = obj.minVal();
                 obj_coeffs = obj.coeffs;
-                if (obj.maxVar() > n_vars) n_vars = obj.maxVar();
+                if (static_cast<unsigned>(obj.maxVar()) > n_vars) n_vars = obj.maxVar();
                 in.skipWhitespace();
                 if (*in == ';') in.skip();
             } else {
                 n_constraints++;
                 
                 Constr constr(in);
-                if (constr.maxVar() > n_vars) n_vars = constr.maxVar();
+                if (static_cast<unsigned>(constr.maxVar()) > n_vars) n_vars = constr.maxVar();
                 Constr::Analysis a = constr.analyse();
                 if (a.unsat) {
                     trivially_unsat = true;

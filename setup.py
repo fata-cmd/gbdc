@@ -21,8 +21,8 @@ from setuptools import setup, Extension
 import os
 
 module = Extension("gbdc",
-                   libraries=["archive", "cadical"],
-                   library_dirs=["lib", os.path.abspath("./build/solvers/src/cadical_external/build")],
+                   libraries=["archive", "cadical", "threadpool"],
+                   library_dirs=["lib", os.path.abspath("./build/solvers/src/cadical_external/build"), os.path.abspath("./build/src/util/threadpool")],
                    include_dirs=["."],
                    sources=["src/gbdlib.cc", "./lib/md5/md5.cpp"])
 

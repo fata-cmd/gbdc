@@ -58,7 +58,7 @@ static realloc_type real_realloc = NULL;
 /* a sentinel value prefixed to each allocation */
 static const size_t sentinel = 0xDEADC0DE;
 
-static const size_t overhead = alignment + sizeof(size_t); // 24 bytes overhead per allocation 
+static const size_t overhead = alignment + sizeof(size_t); // 24 bytes overhead per allocation
 
 /* a simple memory heap for allocations prior to dlsym loading */
 #define INIT_HEAP_SIZE 512 * 512
@@ -68,14 +68,19 @@ static size_t init_heap_use = 0;
 /* output */
 #define PPREFIX "malloc_count ### "
 
-std::atomic<size_t> peak = 0, reserved = 0;
+using namespace TP;
 
-static void inc_allocated(size_t size)
+void unreserve_memory(size_t size)
+{
+    reserved.fetch_sub(size, relaxed);
+}
+
+void inc_allocated(size_t size)
 {
     tl_data->inc_allocated(size);
 }
 
-static void dec_allocated(size_t size)
+void dec_allocated(size_t size)
 {
     unreserve_memory(tl_data->rmem_not_needed(size));
     tl_data->dec_allocated(size);
@@ -97,11 +102,6 @@ bool can_alloc(size_t size)
            !(exchanged = reserved.compare_exchange_weak(_reserved, _reserved + size, relaxed, relaxed)))
         ;
     return exchanged;
-}
-
-void unreserve_memory(size_t size)
-{
-    reserved.fetch_sub(size, relaxed);
 }
 
 void terminate()

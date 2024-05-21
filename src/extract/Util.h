@@ -106,11 +106,7 @@ double ScaledEntropy(std::vector<double> distribution) {
     for (double value : distribution) {
         // snap to 3 digits after decimal point
         int64_t snap = static_cast<int64_t>(std::round(1000*value));
-        if (occurence.count(value)) {
-            occurence[value] = occurence[value] + 1;
-        } else {
-            occurence[value] = 1;
-        }
+        ++occurence[snap];
     }
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
@@ -194,7 +190,7 @@ public:
         unsigned num_components = 0;
         for (unsigned i = 1; i < ccs.size(); ++i)
         {
-            num_components += i == find(ccs[i]);
+            num_components += i == static_cast<unsigned>(find(ccs[i]));
         }
         return num_components;
     }

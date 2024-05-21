@@ -3,7 +3,6 @@
 #include <string>
 #include <algorithm>
 #include <thread>
-#include "nadeau.h"
 #include <iostream>
 #include <mutex>
 #include <atomic>
@@ -12,192 +11,206 @@
 #include "../../extract/OPBBaseFeatures.h"
 #include "../../extract/WCNFBaseFeatures.h"
 
-template class ThreadPool<CNF::BaseFeatures>;
-template class ThreadPool<WCNF::BaseFeatures>;
-template class ThreadPool<OPB::BaseFeatures>;
-template class ThreadPool<CNFGateFeatures>;
-
-thread_local thread_data_t *tl_data;
-thread_local std::uint64_t tl_id = SENTINEL_ID;
-
-std::atomic<uint16_t> threads_working = 0;
-std::mutex termination_ongoing;
-
-size_t mem_max = 1ULL << 30;
-
-template <typename Extractor>
-void ThreadPool<Extractor>::wait_for_completion()
+namespace TP
 {
-    csv_t csv("data.csv", {"time", "allocated", "reserved", "jobs"});
-    size_t tp, total_allocated;
-    size_t begin = std::chrono::steady_clock::now().time_since_epoch().count();
-    const size_t i = 0;
-    while (threads_finished.load(relaxed) != threads.size())
-    {
-        total_allocated = 0;
-        std::for_each(thread_data.begin(), thread_data.end(), [&](const thread_data_t &td)
-                      { total_allocated += td.mem_allocated; });
-        tp = std::chrono::steady_clock::now().time_since_epoch().count();
-        csv.write_to_file({tp - begin, total_allocated, reserved.load(relaxed), threads_working.load(relaxed)});
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    }
-    for (uint i = 0; i < threads.size(); ++i)
-        threads[i].join();
-    // std::cerr << "Peak RSS: " << getPeakRSS() << std::endl;
-}
 
-template <typename Extractor>
-void ThreadPool<Extractor>::work()
-{
-    tl_id = thread_id_counter.fetch_add(1, relaxed);
-    tl_data = &thread_data[tl_id];
-    while (next_job())
+    template class ThreadPool<CNF::BaseFeatures>;
+    template class ThreadPool<WCNF::BaseFeatures>;
+    template class ThreadPool<OPB::BaseFeatures>;
+    template class ThreadPool<CNFGateFeatures>;
+
+    thread_local thread_data_t *tl_data;
+    thread_local std::uint64_t tl_id = SENTINEL_ID;
+
+    std::atomic<size_t> peak = 0, reserved = 0;
+    std::atomic<uint16_t> threads_working = 0;
+    std::mutex termination_ongoing;
+
+    size_t mem_max = 1ULL << 30;
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::start_threadpool()
     {
-        try
+        csv_t csv("data.csv", {"time", "allocated", "reserved", "jobs"});
+        size_t tp, total_allocated;
+        size_t begin = std::chrono::steady_clock::now().time_since_epoch().count();
+        const size_t i = 0;
+        while (threads_finished.load(relaxed) != threads.size())
         {
-            wait_for_starting_permission();
-            Extractor ex(jobs[tl_data->job_idx].path.c_str());
-            ex.extract();
-            output_result(ex);
-            finish_job();
+            total_allocated = 0;
+            std::for_each(thread_data.begin(), thread_data.end(), [&](const thread_data_t &td)
+                          { total_allocated += td.mem_allocated; });
+            tp = std::chrono::steady_clock::now().time_since_epoch().count();
+            csv.write_to_file({tp - begin, total_allocated, reserved.load(relaxed), threads_working.load(relaxed)});
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
-        catch (const TerminationRequest &tr)
+        for (uint i = 0; i < threads.size(); ++i)
+            threads[i].join();
+        // std::cerr << "Peak RSS: " << getPeakRSS() << std::endl;
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::work()
+    {
+        tl_id = thread_id_counter.fetch_add(1, relaxed);
+        tl_data = &thread_data[tl_id];
+        while (next_job())
         {
-            debug_msg(tr.what());
-            requeue_job();
-            cleanup_termination();
-            termination_penalty();
+            try
+            {
+                wait_for_starting_permission();
+                Extractor ex(jobs[tl_data->job_idx].path.c_str());
+                ex.extract();
+                output_result(ex);
+                finish_job();
+            }
+            catch (const TerminationRequest &tr)
+            {
+                debug_msg(tr.what());
+                requeue_job();
+                cleanup_termination();
+                termination_penalty();
+            }
+        }
+        finish_work();
+    }
+
+    template <typename Extractor>
+    bool ThreadPool<Extractor>::next_job()
+    {
+        tl_data->job_idx = next_job_idx.fetch_add(1, relaxed);
+        return tl_data->job_idx < jobs.size();
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::termination_penalty()
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50) * termination_counter.load(relaxed));
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::finish_work()
+    {
+        ++threads_finished;
+    }
+
+    template <typename Extractor>
+    bool ThreadPool<Extractor>::can_start(size_t size)
+    {
+        if (can_alloc(size))
+        {
+            tl_data->set_reserved(size);
+            return true;
+        }
+        return false;
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::wait_for_starting_permission()
+    {
+        while (!can_start(jobs[tl_data->job_idx].memnbt))
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        ++threads_working;
+        debug_msg("Start job " + std::to_string(tl_data->job_idx) + "...\n");
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::requeue_job()
+    {
+        job_t &job = jobs[tl_data->job_idx];
+        if (job.memnbt > mem_max - buffer_per_job)
+        {
+            debug_msg("Cannot requeue job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
+            return;
+        }
+        debug_msg("Requeuing job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
+        job.terminate(std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved));
+        std::unique_lock<std::mutex> lock(jobs_m);
+        jobs.push_back(job);
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::cleanup_termination()
+    {
+        finish_job();
+        termination_counter.fetch_add(1, relaxed);
+        termination_ongoing.unlock();
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::finish_job()
+    {
+        threads_working.fetch_sub(1, relaxed);
+        unreserve_memory(tl_data->unreserve_memory());
+        tl_data->reset();
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::output_result(Extractor &ex)
+    {
+        const job_t &job = jobs[tl_data->job_idx];
+        auto feats = ex.getFeatures();
+        auto names = ex.getNames();
+        std::string result = "";
+        for (std::uint16_t i = 0; i < feats.size(); ++i)
+        {
+            result += names[i] + " = " + std::to_string(feats[i]) + "\n";
+        }
+        debug_msg("File " + job.path + " done!\n");
+        results.push(std::make_pair(feats, true));
+        // debug_msg(result + "\nCurrent memory usage: " + std::to_string(tl_data->mem_allocated) +
+        //           "\nEstimated memory usage: " + std::to_string(job.emn) +
+        //           "\nPeak memory usage: " + std::to_string(tl_data->peak_mem_allocated));
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::init_jobs(const std::vector<std::string> &paths)
+    {
+        for (const auto &path : paths)
+        {
+            std::filesystem::path file_path = path;
+            size_t size = std::filesystem::file_size(file_path);
+            jobs.push_back(job_t(file_path, size, buffer_per_job));
+        }
+        std::sort(jobs.begin(), jobs.end(), [](const job_t &j1, const job_t &j2)
+                  { return j1.file_size < j2.file_size; });
+    }
+
+    template <typename Extractor>
+    void ThreadPool<Extractor>::init_threads(std::uint32_t num_threads)
+    {
+        for (std::uint32_t i = 0; i < num_threads; ++i)
+        {
+            thread_data.emplace_back();
+            threads.emplace_back(std::thread(&ThreadPool::work, this));
         }
     }
-    finish_work();
-}
 
-template <typename Extractor>
-bool ThreadPool<Extractor>::next_job()
-{
-    tl_data->job_idx = next_job_idx.fetch_add(1, relaxed);
-    return tl_data->job_idx < jobs.size();
-}
-
-template <typename Extractor>
-void ThreadPool<Extractor>::termination_penalty()
-{
-    std::this_thread::sleep_for(std::chrono::milliseconds(50) * termination_counter.load(relaxed));
-}
-
-template <typename Extractor>
-void ThreadPool<Extractor>::finish_work()
-{
-    ++threads_finished;
-}
-
-template <typename Extractor>
-bool ThreadPool<Extractor>::can_start(size_t size)
-{
-    if (can_alloc(size))
-    {
-        tl_data->set_reserved(size);
-        return true;
+    template <typename Extractor>
+    MPSCQueue<result_t>* ThreadPool<Extractor>::get_result_queue(){
+        return &results;
     }
-    return false;
-}
 
-template <typename Extractor>
-void ThreadPool<Extractor>::wait_for_starting_permission()
-{
-    while (!can_start(jobs[tl_data->job_idx].memnbt))
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    template <typename Extractor>
+    bool ThreadPool<Extractor>::jobs_completed(){
+        return threads_finished.load() == 0;
     }
-    ++threads_working;
-    debug_msg("Start job " + std::to_string(tl_data->job_idx) + "...\n");
-}
 
-template <typename Extractor>
-void ThreadPool<Extractor>::requeue_job()
-{
-    job_t &job = jobs[tl_data->job_idx];
-    if (job.memnbt > mem_max - buffer_per_job)
+    template <typename Extractor>
+    ThreadPool<Extractor>::ThreadPool(std::vector<std::string> paths, std::uint64_t _mem_max, std::uint32_t _jobs_max)
     {
-        debug_msg("Cannot requeue job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
-        return;
+        mem_max = _mem_max;
+        jobs_max = _jobs_max;
+        init_jobs(paths);
+        init_threads(_jobs_max);
     }
-    debug_msg("Requeuing job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
-    job.terminate(std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved));
-    std::unique_lock<std::mutex> lock(jobs_m);
-    jobs.push_back(job);
-}
 
-template <typename Extractor>
-void ThreadPool<Extractor>::cleanup_termination()
-{
-    finish_job();
-    termination_counter.fetch_add(1, relaxed);
-    termination_ongoing.unlock();
-}
-
-template <typename Extractor>
-void ThreadPool<Extractor>::finish_job()
-{
-    threads_working.fetch_sub(1, relaxed);
-    unreserve_memory(tl_data->unreserve_memory());
-    tl_data->reset();
-}
-
-template <typename Extractor>
-void ThreadPool<Extractor>::output_result(Extractor &ex)
-{
-    const job_t &job = jobs[tl_data->job_idx];
-    auto feats = ex.getFeatures();
-    auto names = ex.getNames();
-    std::string result = "";
-    for (std::uint16_t i = 0; i < feats.size(); ++i)
+    void debug_msg(const std::string &msg)
     {
-        result += names[i] + " = " + std::to_string(feats[i]) + "\n";
-    }
-    debug_msg("File " + job.path + " done!\n");
-    // debug_msg(result + "\nCurrent memory usage: " + std::to_string(tl_data->mem_allocated) +
-    //           "\nEstimated memory usage: " + std::to_string(job.emn) +
-    //           "\nPeak memory usage: " + std::to_string(tl_data->peak_mem_allocated));
-}
-
-template <typename Extractor>
-void ThreadPool<Extractor>::init_jobs(const std::vector<std::string> &paths)
-{
-    for (const auto &path : paths)
-    {
-        std::filesystem::path file_path = path;
-        size_t size = std::filesystem::file_size(file_path);
-        jobs.push_back(job_t(file_path, size, buffer_per_job));
-    }
-    std::sort(jobs.begin(), jobs.end(), [](const job_t &j1, const job_t &j2)
-              { return j1.file_size < j2.file_size; });
-}
-
-template <typename Extractor>
-void ThreadPool<Extractor>::init_threads(std::uint32_t num_threads)
-{
-    for (std::uint32_t i = 0; i < num_threads; ++i)
-    {
-        thread_data.emplace_back();
-        threads.emplace_back(std::thread(&ThreadPool::work, this));
-    }
-}
-
-template <typename Extractor>
-ThreadPool<Extractor>::ThreadPool(std::vector<std::string> paths, std::uint64_t _mem_max, std::uint32_t _jobs_max)
-{
-
-    mem_max = _mem_max;
-    jobs_max = _jobs_max;
-    init_jobs(paths);
-    init_threads(_jobs_max);
-    wait_for_completion();
-}
-
-void debug_msg(const std::string &msg)
-{
 #ifndef NDEBUG
-    std::cerr << "[Thread " + std::to_string(tl_id) + "] " + msg << std::endl;
+        std::cerr << "[Thread " + std::to_string(tl_id) + "] " + msg << std::endl;
 #endif
+    }
 }
