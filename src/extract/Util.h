@@ -46,7 +46,7 @@ double Variance(std::vector<T> distribution, double mean) {
     return vari;
 }
 
-double ScaledEntropyFromOccurenceCounts(std::unordered_map<int64_t, int64_t> occurence, size_t total) {
+static double ScaledEntropyFromOccurenceCounts(std::unordered_map<int64_t, int64_t> occurence, size_t total) {
     // collect and sort summands
     std::vector<long double> summands;
     for (auto& pair : occurence) {
@@ -65,7 +65,7 @@ double ScaledEntropyFromOccurenceCounts(std::unordered_map<int64_t, int64_t> occ
     return log2(summands.size()) == 0 ? 0 : (double)entropy / log2(summands.size());
 }
 
-double ScaledEntropy(std::vector<unsigned> distribution) {
+static double ScaledEntropy(std::vector<unsigned> distribution) {
     std::unordered_map<int64_t, int64_t> occurence;
     for (unsigned value : distribution) {
         if (occurence.count(value)) {
@@ -77,7 +77,7 @@ double ScaledEntropy(std::vector<unsigned> distribution) {
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
 
-double ScaledEntropy(std::vector<int> distribution) {
+static double ScaledEntropy(std::vector<int> distribution) {
     std::unordered_map<int64_t, int64_t> occurence;
     for (unsigned value : distribution) {
         if (occurence.count(value)) {
@@ -89,7 +89,7 @@ double ScaledEntropy(std::vector<int> distribution) {
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
 
-double ScaledEntropy(std::vector<uint64_t> distribution) {
+static double ScaledEntropy(std::vector<uint64_t> distribution) {
     std::unordered_map<int64_t, int64_t> occurence;
     for (unsigned value : distribution) {
         if (occurence.count(value)) {
@@ -101,7 +101,7 @@ double ScaledEntropy(std::vector<uint64_t> distribution) {
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
 
-double ScaledEntropy(std::vector<double> distribution) {
+static double ScaledEntropy(std::vector<double> distribution) {
     std::unordered_map<int64_t, int64_t> occurence;
     for (double value : distribution) {
         // snap to 3 digits after decimal point

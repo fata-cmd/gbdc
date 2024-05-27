@@ -12,6 +12,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
+static std::vector<double> test_extract(std::string filepath)
+{
+    CNF::BaseFeatures stats(filepath.c_str());
+    stats.extract();
+    return stats.getFeatures();
+};
+
 TEST_CASE("Threadpool")
 {
     SUBCASE("Basefeature extraction")
@@ -23,7 +30,8 @@ TEST_CASE("Threadpool")
         {
             paths.push_back(entry.path());
         }
-        TP::ThreadPool<CNF::BaseFeatures>(paths,1UL << 25UL,1U);
+        threadpool::ThreadPool<threadpool::extract_t> tp(1UL << 25UL, 1U, test_extract, paths);
+        tp.start_threadpool();
         // ThreadPool<CNF::BaseFeatures>();
         CHECK_EQ(1, 1);
     }

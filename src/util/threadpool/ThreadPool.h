@@ -8,6 +8,7 @@
 #include <atomic>
 #include "MPSCQueue.h"
 #include "Util.h"
+#include <tuple>
 
 /**
  * @brief Determines whether the requested amount of memory can be allocated or not,
@@ -25,10 +26,10 @@ extern bool can_alloc(size_t size);
  */
 extern void unreserve_memory(size_t size);
 
-namespace TP
+namespace threadpool
 {
-    using result_t = std::pair<std::vector<double>, bool>;
-
+    using result_t = std::tuple<std::string, std::vector<double>, bool>;
+    using extract_t = std::function<std::vector<double, std::allocator<double>>(std::string)>;
     inline constexpr std::uint64_t buffer_per_job = 0; // 1e7;
     inline constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
     inline constexpr std::memory_order relaxed = std::memory_order_relaxed;
@@ -61,6 +62,7 @@ namespace TP
         std::atomic<size_t> termination_counter = 0;
         std::mutex jobs_m;
         MPSCQueue<result_t> results;
+        Extractor func;
 
         /**
          * @brief Work routine for worker threads.
@@ -107,7 +109,7 @@ namespace TP
          *
          * @param ex Current feature extractor, whose extracted features are to be output.
          */
-        void output_result(Extractor &ex);
+        void output_result(const std::vector<double> result);
         /**
          * @brief Initializes the job queue.
          *
@@ -129,7 +131,7 @@ namespace TP
          * @param _mem_max Maximum amount of memory available to the ThreadPool.
          * @param _jobs_max Maximum amount of jobs that can be executed in parallel, i.e. number of threads.
          */
-        explicit ThreadPool(std::vector<std::string> paths, std::uint64_t _mem_max, std::uint32_t _jobs_max);
+        explicit ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, Extractor func, std::vector<std::string> paths);
         
         MPSCQueue<result_t> *get_result_queue();
         /**

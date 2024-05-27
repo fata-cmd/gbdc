@@ -43,6 +43,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "src/util/pybind11/include/pybind11/stl.h"
 
 namespace py = pybind11;
+namespace tp = threadpool;
 
 static std::string version()
 {
@@ -95,6 +96,14 @@ static auto cnf2kis(std::string filename, std::string output, size_t maxEdges, s
 }
 
 template <typename Extractor>
+static std::vector<double> extract_features(std::string filepath)
+{
+    Extractor stats(filepath.c_str());
+    stats.extract();
+    return stats.getFeatures();
+}
+
+template <typename Extractor>
 static auto feature_names()
 {
     Extractor stats("");
@@ -102,27 +111,34 @@ static auto feature_names()
 }
 
 template <typename Extractor>
-void bind_threadpool(py::module &m, const std::string &type_name)
+static void bind_threadpool(py::module &m, const std::string &type_name)
 {
-    py::class_<TP::ThreadPool<Extractor>>(m, type_name.c_str())
-        .def(py::init<std::vector<std::string>, std::uint64_t, std::uint32_t>(),
+    py::class_<tp::ThreadPool<Extractor>>(m, type_name.c_str())
+        .def(py::init<std::uint64_t, std::uint32_t, Extractor, std::vector<std::string>>(),
              "Thread pool used for parallel feature extraction. Takes a list of paths to CNF instances, the maximum amount of memory available and the maximum amount of parallel jobs permitted.",
-             py::arg("paths"), py::arg("mem_max"), py::arg("jobs_max"))
-        .def("get_result_queue", &TP::ThreadPool<Extractor>::get_result_queue, "Returns ownership of the queue which is used to output results from feature extraction.")
-        .def("start_threadpool", &TP::ThreadPool<Extractor>::start_threadpool, "Starts the threadpool. Has to be called after 'get_result_queue', otherwise extracted features can only be accessed after completion of all feature extractions.")
-        .def("jobs_completed", &TP::ThreadPool<Extractor>::jobs_completed, "Returns true if all jobs have been completed, false otherwise.");
+             py::arg("mem_max"), py::arg("jobs_max"), py::arg("extractor_function"), py::arg("paths"))
+        .def("get_result_queue", &tp::ThreadPool<Extractor>::get_result_queue, py::return_value_policy::reference, "Returns reference to the queue which is used to output results from feature extraction.")
+        .def("start_threadpool", &tp::ThreadPool<Extractor>::start_threadpool, "Starts the threadpool. Has to be called after 'get_result_queue', otherwise extracted features can only be accessed after completion of all feature extractions.")
+        .def("jobs_completed", &tp::ThreadPool<Extractor>::jobs_completed, "Returns true if all jobs have been completed, false otherwise.");
 }
 
-PYBIND11_MODULE(gbdlib, m)
+static void bind_MPSCQueue(py::module &m)
 {
-    py::class_<MPSCQueue<TP::result_t>>(m, "MPSCQueue")
-        .def(py::init<>())
-        .def("pop", &MPSCQueue<TP::result_t>::pop, "Pop an element from the queue in a synchronized manner.")
-        .def("empty", &MPSCQueue<TP::result_t>::empty, "Returns true if queue is empty, false otherwise.");
-    bind_threadpool<CNF::BaseFeatures>(m, "extract_base_features");
-    bind_threadpool<CNFGateFeatures>(m, "extract_gate_features");
-    bind_threadpool<OPB::BaseFeatures>(m, "extract_opb_base_features");
-    bind_threadpool<WCNF::BaseFeatures>(m, "extract_wcnf_base_features");
+    py::class_<MPSCQueue<tp::result_t>>(m, "MPSCQueue")
+        .def(py::init<std::uint16_t>())
+        .def("pop", &MPSCQueue<tp::result_t>::pop, "Pop an element from the queue in a synchronized manner.")
+        .def("empty", &MPSCQueue<tp::result_t>::empty, "Returns true if queue is empty, false otherwise.")
+        .def("done", &MPSCQueue<tp::result_t>::done, "Returns true if producers are done, false otherwise.");
+}
+
+PYBIND11_MODULE(gbdc, m)
+{
+    bind_MPSCQueue(m);
+    bind_threadpool<tp::extract_t>(m, "ThreadPool");
+    m.def("extract_base_features", &extract_features<CNF::BaseFeatures>, "Extract base features");
+    m.def("extract_wcnf_base_features", &extract_features<WCNF::BaseFeatures>, "Extract wcnf base features");
+    m.def("extract_opb_base_features", &extract_features<OPB::BaseFeatures>, "Extract opb base features");
+    m.def("extract_gate_features", &extract_features<CNFGateFeatures>, "Extract gate features");
     m.def("version", &version, "Return current version of gbdc.");
     m.def("cnf2kis", &cnf2kis, "Create k-ISP Instance from given CNF Instance.", py::arg("filename"), py::arg("output"), py::arg("maxEdges"), py::arg("maxNodes"));
     m.def("sanitize", &sanitize, "Print sanitized, i.e., no duplicate literals in clauses and no tautologic clauses, CNF to stdout.", py::arg("filename"));

@@ -11,13 +11,10 @@
 #include "../../extract/OPBBaseFeatures.h"
 #include "../../extract/WCNFBaseFeatures.h"
 
-namespace TP
+namespace threadpool
 {
 
-    template class ThreadPool<CNF::BaseFeatures>;
-    template class ThreadPool<WCNF::BaseFeatures>;
-    template class ThreadPool<OPB::BaseFeatures>;
-    template class ThreadPool<CNFGateFeatures>;
+    template class ThreadPool<extract_t>;
 
     thread_local thread_data_t *tl_data;
     thread_local std::uint64_t tl_id = SENTINEL_ID;
@@ -35,7 +32,7 @@ namespace TP
         size_t tp, total_allocated;
         size_t begin = std::chrono::steady_clock::now().time_since_epoch().count();
         const size_t i = 0;
-        while (threads_finished.load(relaxed) != threads.size())
+        while (!jobs_completed())
         {
             total_allocated = 0;
             std::for_each(thread_data.begin(), thread_data.end(), [&](const thread_data_t &td)
@@ -59,9 +56,8 @@ namespace TP
             try
             {
                 wait_for_starting_permission();
-                Extractor ex(jobs[tl_data->job_idx].path.c_str());
-                ex.extract();
-                output_result(ex);
+                auto result = func(jobs[tl_data->job_idx].path);
+                output_result(result);
                 finish_job();
             }
             catch (const TerminationRequest &tr)
@@ -148,18 +144,11 @@ namespace TP
     }
 
     template <typename Extractor>
-    void ThreadPool<Extractor>::output_result(Extractor &ex)
+    void ThreadPool<Extractor>::output_result(const std::vector<double> result)
     {
         const job_t &job = jobs[tl_data->job_idx];
-        auto feats = ex.getFeatures();
-        auto names = ex.getNames();
-        std::string result = "";
-        for (std::uint16_t i = 0; i < feats.size(); ++i)
-        {
-            result += names[i] + " = " + std::to_string(feats[i]) + "\n";
-        }
         debug_msg("File " + job.path + " done!\n");
-        results.push(std::make_pair(feats, true));
+        results.push({job.path, result, true});
         // debug_msg(result + "\nCurrent memory usage: " + std::to_string(tl_data->mem_allocated) +
         //           "\nEstimated memory usage: " + std::to_string(job.emn) +
         //           "\nPeak memory usage: " + std::to_string(tl_data->peak_mem_allocated));
@@ -189,20 +178,21 @@ namespace TP
     }
 
     template <typename Extractor>
-    MPSCQueue<result_t>* ThreadPool<Extractor>::get_result_queue(){
+    MPSCQueue<result_t> *ThreadPool<Extractor>::get_result_queue()
+    {
         return &results;
     }
 
     template <typename Extractor>
-    bool ThreadPool<Extractor>::jobs_completed(){
-        return threads_finished.load() == 0;
+    bool ThreadPool<Extractor>::jobs_completed()
+    {
+        return threads_finished.load(relaxed) == threads.size();
     }
 
     template <typename Extractor>
-    ThreadPool<Extractor>::ThreadPool(std::vector<std::string> paths, std::uint64_t _mem_max, std::uint32_t _jobs_max)
+    ThreadPool<Extractor>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, Extractor _func, std::vector<std::string> paths) : jobs_max(_jobs_max), results(jobs_max), func(_func)
     {
         mem_max = _mem_max;
-        jobs_max = _jobs_max;
         init_jobs(paths);
         init_threads(_jobs_max);
     }

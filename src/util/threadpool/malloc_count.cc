@@ -68,7 +68,7 @@ static size_t init_heap_use = 0;
 /* output */
 #define PPREFIX "malloc_count ### "
 
-using namespace TP;
+using namespace threadpool;
 
 void unreserve_memory(size_t size)
 {
@@ -166,6 +166,7 @@ extern void *malloc(size_t size)
 /* exported free symbol that overrides loading from libc */
 extern void free(void *ptr)
 {
+    std::cerr << "free me \n";
     size_t size;
 
     if (!ptr)
