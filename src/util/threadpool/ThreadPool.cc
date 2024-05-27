@@ -116,13 +116,13 @@ namespace threadpool
     void ThreadPool<Extractor>::requeue_job()
     {
         job_t &job = jobs[tl_data->job_idx];
+        job.terminate(std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved));
         if (job.memnbt > mem_max - buffer_per_job)
         {
             debug_msg("Cannot requeue job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
             return;
         }
         debug_msg("Requeuing job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
-        job.terminate(std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved));
         std::unique_lock<std::mutex> lock(jobs_m);
         jobs.push_back(job);
     }
@@ -157,6 +157,7 @@ namespace threadpool
     template <typename Extractor>
     void ThreadPool<Extractor>::init_jobs(const std::vector<std::string> &paths)
     {
+        jobs.reserve(paths.size() * 1.5);
         for (const auto &path : paths)
         {
             std::filesystem::path file_path = path;
@@ -192,6 +193,7 @@ namespace threadpool
     template <typename Extractor>
     ThreadPool<Extractor>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, Extractor _func, std::vector<std::string> paths) : jobs_max(_jobs_max), results(jobs_max), func(_func)
     {
+        std::cerr << "Initialising thread pool: \nMemory: " << _mem_max << "\nThreads: " << _jobs_max << std::endl;
         mem_max = _mem_max;
         init_jobs(paths);
         init_threads(_jobs_max);

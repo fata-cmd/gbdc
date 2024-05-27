@@ -30,7 +30,7 @@ namespace threadpool
 {
     using result_t = std::tuple<std::string, std::vector<double>, bool>;
     using extract_t = std::function<std::vector<double, std::allocator<double>>(std::string)>;
-    inline constexpr std::uint64_t buffer_per_job = 0; // 1e7;
+    inline constexpr std::uint64_t buffer_per_job = 1e7;
     inline constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
     inline constexpr std::memory_order relaxed = std::memory_order_relaxed;
 
@@ -58,7 +58,7 @@ namespace threadpool
         std::vector<thread_data_t> thread_data;
         std::atomic<std::uint32_t> threads_finished = 0;
         std::atomic<std::uint32_t> next_job_idx = 0;
-        std::atomic<std::uint32_t> thread_id_counter;
+        std::atomic<std::uint32_t> thread_id_counter = 0;
         std::atomic<size_t> termination_counter = 0;
         std::mutex jobs_m;
         MPSCQueue<result_t> results;

@@ -46,6 +46,9 @@
  * alignment requirements, we can optionally add more than just one integer. */
 static const size_t alignment = 16; /* bytes (>= 2*sizeof(size_t)) */
 
+/* set to true after first allocation, used to check for memory corruption*/
+static bool check_sentinel = false;
+
 /* function pointer to the real procedures, loaded using dlsym */
 typedef void *(*malloc_type)(size_t);
 typedef void (*free_type)(void *);
@@ -104,11 +107,12 @@ bool can_alloc(size_t size)
     return exchanged;
 }
 
-void terminate()
+void terminate(size_t last_req)
 {
     // exception allocation needed because of malloc call during libc exception allocation
     tl_data->exception_alloc = true;
-    throw TerminationRequest("Terminating!\nCurrently reserved memory: " + std::to_string(reserved.load()) + "\n");
+    tl_data->mem_allocated += last_req;
+    throw TerminationRequest("");
 }
 
 /****************************************************/
@@ -118,6 +122,9 @@ void terminate()
 /* exported malloc symbol that overrides loading from libc */
 extern void *malloc(size_t size)
 {
+    if (!check_sentinel)
+        check_sentinel = true;
+
     void *ret;
 
     if (size == 0)
@@ -130,11 +137,10 @@ extern void *malloc(size_t size)
             while (!can_alloc(tl_data->rmem_needed(size + alignment)))
             {
                 if (termination_ongoing.try_lock())
-                    terminate();
+                    terminate(size);
             }
             inc_allocated(size + alignment);
         }
-
         /* call read malloc procedure in libc */
         ret = (*real_malloc)(size + alignment);
 
@@ -166,7 +172,6 @@ extern void *malloc(size_t size)
 /* exported free symbol that overrides loading from libc */
 extern void free(void *ptr)
 {
-    std::cerr << "free me \n";
     size_t size;
 
     if (!ptr)
@@ -184,16 +189,21 @@ extern void free(void *ptr)
         return;
     }
 
-    ptr = (char *)ptr - alignment;
-
-    if (*(size_t *)((char *)ptr + alignment - sizeof(size_t)) != sentinel)
+    if (check_sentinel)
     {
-        fprintf(stderr, PPREFIX "free(%p) has no sentinel !!! memory corruption?\n", ptr);
-    }
+        ptr = (char *)ptr - alignment;
 
-    size = *(size_t *)ptr;
-    if (tl_id != SENTINEL_ID)
-        dec_allocated(size);
+        if (*(size_t *)((char *)ptr + alignment - sizeof(size_t)) != sentinel)
+        {
+            std::cerr << tl_id << "\n";
+            fprintf(stderr, PPREFIX "In free(): free(%p) has no sentinel !!! memory corruption?\n", ptr);
+        }
+        if (tl_id != SENTINEL_ID)
+        {
+            size = *(size_t *)ptr;
+            dec_allocated(size);
+        }
+    }
 
     (*real_free)(ptr);
 }
@@ -262,7 +272,7 @@ extern void *realloc(void *ptr, size_t size)
 
     if (*(size_t *)((char *)ptr + alignment - sizeof(size_t)) != sentinel)
     {
-        fprintf(stderr, PPREFIX "free(%p) has no sentinel !!! memory corruption?\n", ptr);
+        fprintf(stderr, PPREFIX "In realloc(): free(%p) has no sentinel !!! memory corruption?\n", ptr);
     }
 
     oldsize = *(size_t *)ptr;

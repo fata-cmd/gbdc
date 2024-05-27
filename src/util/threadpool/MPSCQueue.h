@@ -1,6 +1,7 @@
 #pragma once
 #include <queue>
 #include <mutex>
+#include <list>
 
 template <typename T>
 class MPSCQueue
