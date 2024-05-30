@@ -38,12 +38,19 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include "src/transform/IndependentSet.h"
 #include "src/transform/Normalize.h"
+#include "src/util/ResourceLimits.h"
 
 #include "src/util/pybind11/include/pybind11/pybind11.h"
 #include "src/util/pybind11/include/pybind11/stl.h"
 
 namespace py = pybind11;
 namespace tp = threadpool;
+
+enum class Status
+{
+    TIMEOUT = -1,
+    MEMOUT = -2
+};
 
 static std::string version()
 {
@@ -96,11 +103,50 @@ static auto cnf2kis(std::string filename, std::string output, size_t maxEdges, s
 }
 
 template <typename Extractor>
-static std::vector<double> extract_features(std::string filepath)
+static std::unordered_map<std::string, double> extract_features(const std::string filepath, const size_t rlim, const size_t mlim)
+{
+    std::unordered_map<std::string, double> emergency;
+    ResourceLimits limits(rlim, mlim);
+    limits.set_rlimits();
+    try
+    {
+        Extractor stats(filepath.c_str());
+        stats.extract();
+        std::unordered_map<std::string, double> dict;
+        const auto names = stats.getNames();
+        const auto features = stats.getFeatures();
+        dict["base_features_runtime"] = limits.get_runtime();
+        for (size_t i = 0; i < features.size(); ++i)
+        {
+            dict[names[i]] = features[i];
+        }
+        return dict;
+    }
+    catch (TimeLimitExceeded &e)
+    {
+        emergency["base_features_runtime"] = static_cast<double>(Status::TIMEOUT);
+        return emergency;
+    }
+    catch (MemoryLimitExceeded &e)
+    {
+        emergency["base_features_runtime"] = static_cast<double>(Status::MEMOUT);
+        return emergency;
+    }
+}
+
+template <typename Extractor>
+static std::unordered_map<std::string, double> extract_features(const std::string filepath)
 {
     Extractor stats(filepath.c_str());
     stats.extract();
-    return stats.getFeatures();
+    std::unordered_map<std::string, double> dict;
+    const auto names = stats.getNames();
+    const auto features = stats.getFeatures();
+    for (size_t i = 0; i < features.size(); ++i)
+    {
+        dict[names[i]] = features[i];
+    }
+    return dict;
 }
 
 template <typename Extractor>
@@ -135,10 +181,18 @@ PYBIND11_MODULE(gbdc, m)
 {
     bind_MPSCQueue(m, "MPSCQueue");
     bind_threadpool<tp::extract_t>(m, "ThreadPool");
-    m.def("extract_base_features", &extract_features<CNF::BaseFeatures>, "Extract base features", py::arg("filepath"));
-    m.def("extract_wcnf_base_features", &extract_features<WCNF::BaseFeatures>, "Extract wcnf base features", py::arg("filepath"));
-    m.def("extract_opb_base_features", &extract_features<OPB::BaseFeatures>, "Extract opb base features", py::arg("filepath"));
-    m.def("extract_gate_features", &extract_features<CNFGateFeatures>, "Extract gate features", py::arg("filepath"));
+    py::enum_<Status>(m, "Status")
+        .value("TIMEOUT", Status::TIMEOUT)
+        .value("MEMOUT", Status::MEMOUT)
+        .export_values();
+    m.def("extract_base_features", py::overload_cast<const std::string, const size_t, const size_t>(&extract_features<CNF::BaseFeatures>), "Extract base features", py::arg("filepath"), py::arg("rlim"), py::arg("mlim"));
+    m.def("extract_base_features", py::overload_cast<const std::string>(&extract_features<CNF::BaseFeatures>), "Extract base features", py::arg("filepath"));
+    m.def("extract_wcnf_base_features", py::overload_cast<const std::string, const size_t, const size_t>(&extract_features<WCNF::BaseFeatures>), "Extract wcnf base features", py::arg("filepath"),py::arg("rlim"), py::arg("mlim"));
+    m.def("extract_wcnf_base_features", py::overload_cast<const std::string>(&extract_features<WCNF::BaseFeatures>), "Extract wcnf base features", py::arg("filepath"));
+    m.def("extract_opb_base_features", py::overload_cast<const std::string, const size_t, const size_t>(&extract_features<OPB::BaseFeatures>), "Extract opb base features", py::arg("filepath"), py::arg("rlim"), py::arg("mlim"));
+    m.def("extract_opb_base_features", py::overload_cast<const std::string>(&extract_features<OPB::BaseFeatures>), "Extract opb base features", py::arg("filepath"));
+    m.def("extract_gate_features", py::overload_cast<const std::string, const size_t, const size_t>(&extract_features<CNFGateFeatures>), "Extract gate features", py::arg("filepath"), py::arg("rlim"), py::arg("mlim"));
+    m.def("extract_gate_features", py::overload_cast<const std::string>(&extract_features<CNFGateFeatures>), "Extract gate features", py::arg("filepath"));
     m.def("version", &version, "Return current version of gbdc.");
     m.def("cnf2kis", &cnf2kis, "Create k-ISP Instance from given CNF Instance.", py::arg("filename"), py::arg("output"), py::arg("maxEdges"), py::arg("maxNodes"));
     m.def("sanitize", &sanitize, "Print sanitized, i.e., no duplicate literals in clauses and no tautologic clauses, CNF to stdout.", py::arg("filename"));

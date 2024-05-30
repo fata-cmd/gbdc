@@ -101,12 +101,17 @@ static double ScaledEntropy(std::vector<uint64_t> distribution) {
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }
 
-static double ScaledEntropy(std::vector<double> distribution) {
+static double ScaledEntropy(std::vector<double> distribution){
     std::unordered_map<int64_t, int64_t> occurence;
-    for (double value : distribution) {
+    for (double value : distribution)    {
         // snap to 3 digits after decimal point
-        int64_t snap = static_cast<int64_t>(std::round(1000*value));
-        ++occurence[snap];
+        int64_t snap = static_cast<int64_t>(std::round(1000 * value));
+        if (occurence.count(value)) {
+            occurence[value] = occurence[value] + 1;
+        }
+        else {
+            occurence[value] = 1;
+        }
     }
     return ScaledEntropyFromOccurenceCounts(occurence, distribution.size());
 }

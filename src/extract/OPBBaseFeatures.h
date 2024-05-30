@@ -172,7 +172,8 @@ class BaseFeatures : public IExtractor {
     virtual ~BaseFeatures() { }
 
     virtual void extract() {
-        StreamBuffer in(filename_);
+        StreamBuffer in(filename_, 42);
+        in.init();
 
         bool seen_obj = false;
         while (in.skipWhitespace()) {

@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <filesystem>
 #include <string>
+#include <thread>
 
 #include "src/test/Util.h"
 #include "src/extract/CNFBaseFeatures.h"
@@ -30,9 +31,34 @@ TEST_CASE("Threadpool")
         {
             paths.push_back(entry.path());
         }
-        threadpool::ThreadPool<threadpool::extract_t> tp(1UL << 25UL, 1U, test_extract, paths);
-        tp.start_threadpool();
-        // ThreadPool<CNF::BaseFeatures>();
-        CHECK_EQ(1, 1);
+        threadpool::ThreadPool<threadpool::extract_t> tp(1UL << 25UL, 2U, test_extract, paths);
+        auto q = tp.get_result_queue();
+        std::thread tp_thread(&threadpool::ThreadPool<threadpool::extract_t>::start_threadpool, &tp);
+        auto names = CNF::BaseFeatures("").getNames();
+        size_t job_counter = 0;
+        while (!tp.jobs_completed() || !q->empty())
+        {
+            if (!q->empty())
+            {
+                ++job_counter;
+                auto f = q->pop();
+                CHECK_EQ(std::get<2>(f),!std::get<1>(f).empty());
+                // std::cerr << "Path: " << std::get<0>(f) << "\n";
+                // if (std::get<2>(f))
+                //     std::cerr << "Features succesfully extracted\n";
+                // else
+                //     std::cerr << "Features could not be extracted\n";
+
+                // auto features = std::get<1>(f);
+                // for (size_t i = 0; i < features.size(); ++i)
+                // {
+                //     std::cerr << names[i] << "=" << features[i] << "\n";
+                // }
+            }
+            else
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        tp_thread.join();
+        CHECK_EQ(paths.size(), job_counter);
     }
 }

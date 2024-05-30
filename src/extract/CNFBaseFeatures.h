@@ -153,7 +153,7 @@ class BaseFeatures2 : public IExtractor {
 
     unsigned n_vars = 0, n_clauses = 0;
 
-    // VCG Degree Distribution
+    // VCG Degree Distribwait_for_starting_permissionution
     std::vector<unsigned> vcg_cdegree; // clause sizes
     std::vector<unsigned> vcg_vdegree; // occurence counts
 

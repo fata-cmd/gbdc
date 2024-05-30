@@ -19,6 +19,11 @@ public:
         q.push(t);
     }
 
+    void push(const T& t){
+        std::unique_lock<std::mutex> l(m);
+        q.push(t);
+    }
+
     T pop()
     {
         std::unique_lock<std::mutex> l(m);

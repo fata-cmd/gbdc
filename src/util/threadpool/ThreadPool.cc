@@ -18,11 +18,12 @@ namespace threadpool
 
     thread_local thread_data_t *tl_data;
     thread_local std::uint64_t tl_id = SENTINEL_ID;
+    thread_local job_t tl_job;
+    std::mutex termination_ongoing;
 
     std::atomic<size_t> peak = 0, reserved = 0;
     std::atomic<uint16_t> threads_working = 0;
-    std::mutex termination_ongoing;
-
+    size_t job_counter = 0;
     size_t mem_max = 1ULL << 30;
 
     template <typename Extractor>
@@ -51,22 +52,32 @@ namespace threadpool
     {
         tl_id = thread_id_counter.fetch_add(1, relaxed);
         tl_data = &thread_data[tl_id];
+        bool terminated = false;
         while (next_job())
         {
+            if (terminated)
+            {
+                cleanup_termination();
+                terminated = false;
+            }
+            wait_for_starting_permission();
             try
             {
-                wait_for_starting_permission();
-                auto result = func(jobs[tl_data->job_idx].path);
-                output_result(result);
+                auto result = func(tl_job.path);
+                output_result(result, true);
                 finish_job();
             }
             catch (const TerminationRequest &tr)
             {
-                debug_msg(tr.what());
-                requeue_job();
-                cleanup_termination();
-                termination_penalty();
+                if (strlen(tr.what()) != 0)
+                    debug_msg(tr.what());
+                requeue_job(tr.memnbt);
+                terminated = true;
             }
+        }
+        if (terminated)
+        {
+            cleanup_termination();
         }
         finish_work();
     }
@@ -74,8 +85,13 @@ namespace threadpool
     template <typename Extractor>
     bool ThreadPool<Extractor>::next_job()
     {
-        tl_data->job_idx = next_job_idx.fetch_add(1, relaxed);
-        return tl_data->job_idx < jobs.size();
+        std::unique_lock<std::mutex> l(jobs_m);
+        if (!jobs.empty())
+        {
+            tl_job = jobs.pop();
+            return true;
+        }
+        return false;
     }
 
     template <typename Extractor>
@@ -104,27 +120,28 @@ namespace threadpool
     template <typename Extractor>
     void ThreadPool<Extractor>::wait_for_starting_permission()
     {
-        while (!can_start(jobs[tl_data->job_idx].memnbt))
+        debug_msg("Waiting...\n");
+        while (!can_start(tl_job.memnbt))
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         ++threads_working;
-        debug_msg("Start job " + std::to_string(tl_data->job_idx) + "...\n");
+        debug_msg("Start job with index " + std::to_string(tl_job.idx) + " ...");
     }
 
     template <typename Extractor>
-    void ThreadPool<Extractor>::requeue_job()
+    void ThreadPool<Extractor>::requeue_job(size_t memnbt)
     {
-        job_t &job = jobs[tl_data->job_idx];
-        job.terminate(std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved));
-        if (job.memnbt > mem_max - buffer_per_job)
+        tl_job.terminate_job(memnbt);
+        if (tl_job.memnbt > mem_max - buffer_per_job)
         {
-            debug_msg("Cannot requeue job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
+            debug_msg("Cannot requeue job with path " + tl_job.path + "!\nMemory needed before termination: " + std::to_string(tl_job.memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max - (size_t)1e6));
+            output_result({}, false);
             return;
         }
-        debug_msg("Requeuing job with path " + job.path + "!\nMemory needed before termination: " + std::to_string(tl_data->peak_mem_allocated) + "\nMaximum amount of memory available: " + std::to_string(mem_max - 1e6));
+        debug_msg("Requeuing job with path " + tl_job.path + "!\nMemory needed before termination: " + std::to_string(tl_job.memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max - (size_t)1e6));
         std::unique_lock<std::mutex> lock(jobs_m);
-        jobs.push_back(job);
+        jobs.push(tl_job);
     }
 
     template <typename Extractor>
@@ -133,39 +150,36 @@ namespace threadpool
         finish_job();
         termination_counter.fetch_add(1, relaxed);
         termination_ongoing.unlock();
+        termination_penalty();
     }
 
     template <typename Extractor>
     void ThreadPool<Extractor>::finish_job()
     {
         threads_working.fetch_sub(1, relaxed);
-        unreserve_memory(tl_data->unreserve_memory());
+        size_t to_be_unreserved = tl_data->unreserve_memory();
+        unreserve_memory(to_be_unreserved);
         tl_data->reset();
     }
 
     template <typename Extractor>
-    void ThreadPool<Extractor>::output_result(const std::vector<double> result)
+    void ThreadPool<Extractor>::output_result(const std::vector<double> result, const bool success)
     {
-        const job_t &job = jobs[tl_data->job_idx];
-        debug_msg("File " + job.path + " done!\n");
-        results.push({job.path, result, true});
-        // debug_msg(result + "\nCurrent memory usage: " + std::to_string(tl_data->mem_allocated) +
-        //           "\nEstimated memory usage: " + std::to_string(job.emn) +
-        //           "\nPeak memory usage: " + std::to_string(tl_data->peak_mem_allocated));
+        const job_t &job = tl_job;
+        debug_msg("Extraction for " + job.path + (success ? "" : " not ") + "succesful!\n");
+        results.push({job.path, result, success});
     }
 
     template <typename Extractor>
     void ThreadPool<Extractor>::init_jobs(const std::vector<std::string> &paths)
     {
-        jobs.reserve(paths.size() * 1.5);
+        size_t idx = 0;
         for (const auto &path : paths)
         {
             std::filesystem::path file_path = path;
             size_t size = std::filesystem::file_size(file_path);
-            jobs.push_back(job_t(file_path, size, buffer_per_job));
+            jobs.push(job_t(file_path, size, buffer_per_job, idx++));
         }
-        std::sort(jobs.begin(), jobs.end(), [](const job_t &j1, const job_t &j2)
-                  { return j1.file_size < j2.file_size; });
     }
 
     template <typename Extractor>
@@ -191,7 +205,7 @@ namespace threadpool
     }
 
     template <typename Extractor>
-    ThreadPool<Extractor>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, Extractor _func, std::vector<std::string> paths) : jobs_max(_jobs_max), results(jobs_max), func(_func)
+    ThreadPool<Extractor>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, Extractor _func, std::vector<std::string> paths) : jobs_max(_jobs_max), jobs(jobs_max), results(jobs_max), func(_func)
     {
         std::cerr << "Initialising thread pool: \nMemory: " << _mem_max << "\nThreads: " << _jobs_max << std::endl;
         mem_max = _mem_max;

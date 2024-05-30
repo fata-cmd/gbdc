@@ -45,7 +45,8 @@ namespace threadpool
     class TerminationRequest : public std::runtime_error
     {
     public:
-        explicit TerminationRequest(const std::string &msg) : std::runtime_error(msg) {}
+        size_t memnbt;
+        explicit TerminationRequest(size_t _memnbt) : memnbt(_memnbt), std::runtime_error("") {}
     };
 
     template <typename Extractor>
@@ -53,7 +54,7 @@ namespace threadpool
     {
     private:
         size_t jobs_max;
-        std::vector<job_t> jobs;
+        MPSCQueue<job_t> jobs;
         std::vector<std::thread> threads;
         std::vector<thread_data_t> thread_data;
         std::atomic<std::uint32_t> threads_finished = 0;
@@ -94,6 +95,7 @@ namespace threadpool
          *
          */
         void requeue_job();
+        void requeue_job(size_t memnbt);
         /**
          * @brief General cleanup function. Resets the state of the thread such that a new job can be started.
          */
@@ -109,7 +111,7 @@ namespace threadpool
          *
          * @param ex Current feature extractor, whose extracted features are to be output.
          */
-        void output_result(const std::vector<double> result);
+        void output_result(const std::vector<double> result, const bool success);
         /**
          * @brief Initializes the job queue.
          *

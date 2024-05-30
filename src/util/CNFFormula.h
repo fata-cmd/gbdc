@@ -90,7 +90,8 @@ class CNFFormula {
     }
 
     void readDimacsFromFile(const char* filename) {
-        StreamBuffer in(filename);
+        StreamBuffer in(filename, 42);
+        in.init();
         Cl clause;
         while (in.skipWhitespace()) {
             if (*in == 'p' || *in == 'c') {

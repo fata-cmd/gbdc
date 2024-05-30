@@ -107,12 +107,11 @@ bool can_alloc(size_t size)
     return exchanged;
 }
 
-void terminate(size_t last_req)
+void terminate(size_t lrq)
 {
     // exception allocation needed because of malloc call during libc exception allocation
     tl_data->exception_alloc = true;
-    tl_data->mem_allocated += last_req;
-    throw TerminationRequest("");
+    throw TerminationRequest(std::max(tl_data->mem_allocated + lrq, std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved)));
 }
 
 /****************************************************/
@@ -197,6 +196,7 @@ extern void free(void *ptr)
         {
             std::cerr << tl_id << "\n";
             fprintf(stderr, PPREFIX "In free(): free(%p) has no sentinel !!! memory corruption?\n", ptr);
+            throw;
         }
         if (tl_id != SENTINEL_ID)
         {
@@ -236,6 +236,7 @@ extern void *realloc(void *ptr, size_t size)
         {
             fprintf(stderr, PPREFIX "realloc(%p) has no sentinel !!! memory corruption?\n",
                     ptr);
+            throw;
         }
 
         oldsize = *(size_t *)ptr;
@@ -273,6 +274,7 @@ extern void *realloc(void *ptr, size_t size)
     if (*(size_t *)((char *)ptr + alignment - sizeof(size_t)) != sentinel)
     {
         fprintf(stderr, PPREFIX "In realloc(): free(%p) has no sentinel !!! memory corruption?\n", ptr);
+        throw;
     }
 
     oldsize = *(size_t *)ptr;

@@ -68,7 +68,8 @@ class BaseFeatures1 : public IExtractor {
     virtual ~BaseFeatures1() { }
 
     virtual void extract() {
-        StreamBuffer in(filename_);
+        StreamBuffer in(filename_, 42);
+        in.init();
 
         Cl clause;
         uint64_t top = 0; // if top is 0, parsing new file format
@@ -231,7 +232,8 @@ class BaseFeatures2 : public IExtractor {
     virtual ~BaseFeatures2() { }
 
     virtual void extract() {
-        StreamBuffer in(filename_);
+        StreamBuffer in(filename_, 42);
+        in.init();
 
         Cl clause;
         uint64_t top = 0; // if top is 0, parsing new file format
@@ -282,11 +284,10 @@ class BaseFeatures2 : public IExtractor {
             }
         }
 
-        // close unused StreamBuffer
-        in.~StreamBuffer();
-
         // clause graph features
-        StreamBuffer in2(filename_);
+        StreamBuffer in2(filename_,42);
+        in2.init();
+
         while (in2.skipWhitespace()) {
             if (*in2 == 'c' || *in2 == 'p') {
                 if (!in2.skipLine()) break;

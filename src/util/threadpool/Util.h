@@ -72,8 +72,10 @@ struct job_t
     size_t emn = 0; // estimated memory needed
     size_t file_size;
     size_t memnbt; // memory needed before termination
-    job_t(std::string _path, size_t _file_size, size_t buffer_per_job = 0) : path(_path), file_size(_file_size), memnbt(buffer_per_job) {}
-    void terminate(size_t _memnbt){
+    size_t idx;
+    job_t(){}
+    job_t(std::string _path, size_t _file_size, size_t buffer_per_job = 0, size_t _idx = 0) : path(_path), file_size(_file_size), memnbt(buffer_per_job), idx(_idx) {}
+    void terminate_job(size_t _memnbt){
         memnbt = _memnbt;
         ++termination_count;
     }
@@ -92,8 +94,6 @@ struct thread_data_t
     size_t peak_mem_allocated = 0UL;
     /* number of calls to malloc for current job */
     size_t num_allocs = 0UL;
-    /* index of current job */
-    std::uint32_t job_idx = 0U;
 
     void inc_allocated(const size_t size)
     {
