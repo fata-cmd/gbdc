@@ -9,6 +9,7 @@
 #include "MPSCQueue.h"
 #include "Util.h"
 #include <tuple>
+#include <variant>
 
 /**
  * @brief Determines whether the requested amount of memory can be allocated or not,
@@ -28,8 +29,10 @@ extern void unreserve_memory(size_t size);
 
 namespace threadpool
 {
-    using result_t = std::tuple<std::string, std::vector<double>, bool>;
-    using extract_t = std::function<std::vector<double, std::allocator<double>>(std::string)>;
+    template<typename T>
+    using result_t = std::tuple<T, bool>;
+    using extract_t = std::vector<double, std::allocator<double>>(std::string);
+
     inline constexpr std::uint64_t buffer_per_job = 1e7;
     inline constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
     inline constexpr std::memory_order relaxed = std::memory_order_relaxed;
@@ -49,21 +52,22 @@ namespace threadpool
         explicit TerminationRequest(size_t _memnbt) : memnbt(_memnbt), std::runtime_error("") {}
     };
 
-    template <typename Extractor>
+    template <typename Ret, typename... Args>
     class ThreadPool
     {
     private:
         size_t jobs_max;
-        MPSCQueue<job_t> jobs;
+        MPSCQueue<job_t<Args...>> jobs;
         std::vector<std::thread> threads;
         std::vector<thread_data_t> thread_data;
+        std::vector<job_t<Args...>> in_process;
         std::atomic<std::uint32_t> threads_finished = 0;
         std::atomic<std::uint32_t> next_job_idx = 0;
         std::atomic<std::uint32_t> thread_id_counter = 0;
         std::atomic<size_t> termination_counter = 0;
         std::mutex jobs_m;
-        MPSCQueue<result_t> results;
-        Extractor func;
+        MPSCQueue<result_t<Ret>> results;
+        std::function<Ret(Args...)> func;
 
         /**
          * @brief Work routine for worker threads.
@@ -111,13 +115,13 @@ namespace threadpool
          *
          * @param ex Current feature extractor, whose extracted features are to be output.
          */
-        void output_result(const std::vector<double> result, const bool success);
+        void output_result(const Ret result, const bool success);
         /**
          * @brief Initializes the job queue.
          *
          * @param paths List of paths to instances, for which feature extraction shall be done.
          */
-        void init_jobs(const std::vector<std::string> &paths);
+        void init_jobs(const std::vector<std::tuple<Args...>> &args);
         /**
          * @brief Initializes worker threads.
          *
@@ -133,9 +137,9 @@ namespace threadpool
          * @param _mem_max Maximum amount of memory available to the ThreadPool.
          * @param _jobs_max Maximum amount of jobs that can be executed in parallel, i.e. number of threads.
          */
-        explicit ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, Extractor func, std::vector<std::string> paths);
-        
-        MPSCQueue<result_t> *get_result_queue();
+        explicit ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, std::function<Ret(Args...)> func, std::vector<std::tuple<Args...>> args);
+
+        MPSCQueue<result_t<Ret>> *get_result_queue();
         /**
          * @brief Called by master thread at the beginning of the program. Frequently samples execution data.
          */

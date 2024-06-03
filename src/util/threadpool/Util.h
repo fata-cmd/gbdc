@@ -65,16 +65,16 @@ public:
     }
 };
 
+template <typename ...Args>
 struct job_t
 {
-    std::string path;
+    std::tuple<Args...> arg;
     size_t termination_count = 0;
     size_t emn = 0; // estimated memory needed
-    size_t file_size;
     size_t memnbt; // memory needed before termination
     size_t idx;
     job_t(){}
-    job_t(std::string _path, size_t _file_size, size_t buffer_per_job = 0, size_t _idx = 0) : path(_path), file_size(_file_size), memnbt(buffer_per_job), idx(_idx) {}
+    job_t(std::tuple<Args...> _arg, size_t buffer_per_job = 0, size_t _idx = 0) : arg(_arg), memnbt(buffer_per_job), idx(_idx) {}
     void terminate_job(size_t _memnbt){
         memnbt = _memnbt;
         ++termination_count;

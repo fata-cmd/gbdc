@@ -13,6 +13,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
+
 static std::vector<double> test_extract(std::string filepath)
 {
     CNF::BaseFeatures stats(filepath.c_str());
@@ -26,14 +27,14 @@ TEST_CASE("Threadpool")
     {
         namespace fs = std::filesystem;
         const std::string folderPath = "src/test/resources/benchmarks";
-        std::vector<std::string> paths;
+        std::vector<std::tuple<std::string>> paths;
         for (const auto &entry : fs::directory_iterator(folderPath))
         {
             paths.push_back(entry.path());
         }
-        threadpool::ThreadPool<threadpool::extract_t> tp(1UL << 25UL, 2U, test_extract, paths);
+        threadpool::ThreadPool<std::vector<double>,std::string> tp(1UL << 25UL, 2U, test_extract, paths);
         auto q = tp.get_result_queue();
-        std::thread tp_thread(&threadpool::ThreadPool<threadpool::extract_t>::start_threadpool, &tp);
+        std::thread tp_thread(&threadpool::ThreadPool<std::vector<double>,std::string>::start_threadpool, &tp);
         auto names = CNF::BaseFeatures("").getNames();
         size_t job_counter = 0;
         while (!tp.jobs_completed() || !q->empty())
@@ -42,7 +43,7 @@ TEST_CASE("Threadpool")
             {
                 ++job_counter;
                 auto f = q->pop();
-                CHECK_EQ(std::get<2>(f),!std::get<1>(f).empty());
+                CHECK_EQ(std::get<1>(f),!std::get<0>(f).empty());
                 // std::cerr << "Path: " << std::get<0>(f) << "\n";
                 // if (std::get<2>(f))
                 //     std::cerr << "Features succesfully extracted\n";

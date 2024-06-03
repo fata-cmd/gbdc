@@ -14,11 +14,11 @@
 namespace threadpool
 {
 
-    template class ThreadPool<extract_t>;
+    template class ThreadPool<std::string, std::string>;
+    template class ThreadPool<std::vector<double>,std::string>;
 
     thread_local thread_data_t *tl_data;
     thread_local std::uint64_t tl_id = SENTINEL_ID;
-    thread_local job_t tl_job;
     std::mutex termination_ongoing;
 
     std::atomic<size_t> peak = 0, reserved = 0;
@@ -26,8 +26,8 @@ namespace threadpool
     size_t job_counter = 0;
     size_t mem_max = 1ULL << 30;
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::start_threadpool()
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::start_threadpool()
     {
         csv_t csv("data.csv", {"time", "allocated", "reserved", "jobs"});
         size_t tp, total_allocated;
@@ -47,8 +47,8 @@ namespace threadpool
         // std::cerr << "Peak RSS: " << getPeakRSS() << std::endl;
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::work()
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::work()
     {
         tl_id = thread_id_counter.fetch_add(1, relaxed);
         tl_data = &thread_data[tl_id];
@@ -63,7 +63,7 @@ namespace threadpool
             wait_for_starting_permission();
             try
             {
-                auto result = func(tl_job.path);
+                auto result = std::apply(func, in_process[tl_id].arg);
                 output_result(result, true);
                 finish_job();
             }
@@ -82,32 +82,32 @@ namespace threadpool
         finish_work();
     }
 
-    template <typename Extractor>
-    bool ThreadPool<Extractor>::next_job()
+    template <typename Ret, typename... Args>
+    bool ThreadPool<Ret, Args...>::next_job()
     {
         std::unique_lock<std::mutex> l(jobs_m);
         if (!jobs.empty())
         {
-            tl_job = jobs.pop();
+            in_process[tl_id] = jobs.pop();
             return true;
         }
         return false;
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::termination_penalty()
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::termination_penalty()
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(50) * termination_counter.load(relaxed));
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::finish_work()
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::finish_work()
     {
         ++threads_finished;
     }
 
-    template <typename Extractor>
-    bool ThreadPool<Extractor>::can_start(size_t size)
+    template <typename Ret, typename... Args>
+    bool ThreadPool<Ret, Args...>::can_start(size_t size)
     {
         if (can_alloc(size))
         {
@@ -117,35 +117,35 @@ namespace threadpool
         return false;
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::wait_for_starting_permission()
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::wait_for_starting_permission()
     {
         debug_msg("Waiting...\n");
-        while (!can_start(tl_job.memnbt))
+        while (!can_start(in_process[tl_id].memnbt))
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         ++threads_working;
-        debug_msg("Start job with index " + std::to_string(tl_job.idx) + " ...");
+        debug_msg("Start job with index " + std::to_string(in_process[tl_id].idx) + " ...");
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::requeue_job(size_t memnbt)
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::requeue_job(size_t memnbt)
     {
-        tl_job.terminate_job(memnbt);
-        if (tl_job.memnbt > mem_max - buffer_per_job)
+        in_process[tl_id].terminate_job(memnbt);
+        if (in_process[tl_id].memnbt > mem_max - buffer_per_job)
         {
-            debug_msg("Cannot requeue job with path " + tl_job.path + "!\nMemory needed before termination: " + std::to_string(tl_job.memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max - (size_t)1e6));
+            debug_msg("Cannot requeue job!\nMemory needed before termination: " + std::to_string(in_process[tl_id].memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max - (size_t)1e6));
             output_result({}, false);
             return;
         }
-        debug_msg("Requeuing job with path " + tl_job.path + "!\nMemory needed before termination: " + std::to_string(tl_job.memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max - (size_t)1e6));
+        debug_msg("Requeuing job!\nMemory needed before termination: " + std::to_string(in_process[tl_id].memnbt) + "\nMaximum amount of memory available: " + std::to_string(mem_max - (size_t)1e6));
         std::unique_lock<std::mutex> lock(jobs_m);
-        jobs.push(tl_job);
+        jobs.push(in_process[tl_id]);
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::cleanup_termination()
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::cleanup_termination()
     {
         finish_job();
         termination_counter.fetch_add(1, relaxed);
@@ -153,8 +153,8 @@ namespace threadpool
         termination_penalty();
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::finish_job()
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::finish_job()
     {
         threads_working.fetch_sub(1, relaxed);
         size_t to_be_unreserved = tl_data->unreserve_memory();
@@ -162,28 +162,25 @@ namespace threadpool
         tl_data->reset();
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::output_result(const std::vector<double> result, const bool success)
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::output_result(const Ret result, const bool success)
     {
-        const job_t &job = tl_job;
-        debug_msg("Extraction for " + job.path + (success ? "" : " not ") + "succesful!\n");
-        results.push({job.path, result, success});
+        debug_msg("Extraction for " + std::get<0>(in_process[tl_id].arg) + (success ? "" : " not ") + "succesful!\n");
+        results.push({result, success});
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::init_jobs(const std::vector<std::string> &paths)
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::init_jobs(const std::vector<std::tuple<Args...>> &args)
     {
         size_t idx = 0;
-        for (const auto &path : paths)
+        for (const auto &arg : args)
         {
-            std::filesystem::path file_path = path;
-            size_t size = std::filesystem::file_size(file_path);
-            jobs.push(job_t(file_path, size, buffer_per_job, idx++));
+            jobs.push(job_t<Args...>(arg, buffer_per_job, idx++));
         }
     }
 
-    template <typename Extractor>
-    void ThreadPool<Extractor>::init_threads(std::uint32_t num_threads)
+    template <typename Ret, typename... Args>
+    void ThreadPool<Ret, Args...>::init_threads(std::uint32_t num_threads)
     {
         for (std::uint32_t i = 0; i < num_threads; ++i)
         {
@@ -192,24 +189,24 @@ namespace threadpool
         }
     }
 
-    template <typename Extractor>
-    MPSCQueue<result_t> *ThreadPool<Extractor>::get_result_queue()
+    template <typename Ret, typename... Args>
+    MPSCQueue<result_t<Ret>> *ThreadPool<Ret, Args...>::get_result_queue()
     {
         return &results;
     }
 
-    template <typename Extractor>
-    bool ThreadPool<Extractor>::jobs_completed()
+    template <typename Ret, typename... Args>
+    bool ThreadPool<Ret, Args...>::jobs_completed()
     {
         return threads_finished.load(relaxed) == threads.size();
     }
 
-    template <typename Extractor>
-    ThreadPool<Extractor>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, Extractor _func, std::vector<std::string> paths) : jobs_max(_jobs_max), jobs(jobs_max), results(jobs_max), func(_func)
+    template <typename Ret, typename... Args>
+    ThreadPool<Ret, Args...>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, std::function<Ret(Args...)> _func, std::vector<std::tuple<Args...>> args) : in_process(_jobs_max), jobs_max(_jobs_max), jobs(jobs_max), results(jobs_max), func(_func)
     {
         std::cerr << "Initialising thread pool: \nMemory: " << _mem_max << "\nThreads: " << _jobs_max << std::endl;
         mem_max = _mem_max;
-        init_jobs(paths);
+        init_jobs(args);
         init_threads(_jobs_max);
     }
 
