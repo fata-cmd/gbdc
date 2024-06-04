@@ -14,6 +14,8 @@
 namespace threadpool
 {
 
+    template class ThreadPool<compute_ret_t, std::string,std::string, std::unordered_map<std::string, long>>;
+    // template class ThreadPool<std::vector<std::tuple<std::string, std::string, std::variant<double, long, std::string>>>,std::string, std::string, std::unordered_map<std::string, long>>;
     template class ThreadPool<std::string, std::string>;
     template class ThreadPool<std::vector<double>,std::string>;
 
@@ -165,7 +167,7 @@ namespace threadpool
     template <typename Ret, typename... Args>
     void ThreadPool<Ret, Args...>::output_result(const Ret result, const bool success)
     {
-        debug_msg("Extraction for " + std::get<0>(in_process[tl_id].arg) + (success ? "" : " not ") + "succesful!\n");
+        debug_msg("Extraction " + std::string(success ? " " : " not ") + "succesful!\n");
         results.push({result, success});
     }
 

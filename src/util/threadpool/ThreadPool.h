@@ -29,7 +29,10 @@ extern void unreserve_memory(size_t size);
 
 namespace threadpool
 {
-    template<typename T>
+    using compute_ret_t = std::vector<std::tuple<std::string, std::string, std::variant<double, long, std::string>>>;
+    using compute_arg_t = std::tuple<std::string, std::string, std::unordered_map<std::string, long>>;
+    using compute_t = std::tuple<compute_ret_t, compute_arg_t>;
+    template <typename T>
     using result_t = std::tuple<T, bool>;
     using extract_t = std::vector<double, std::allocator<double>>(std::string);
 

@@ -162,9 +162,9 @@ template <typename Ret, typename... Args>
 static void bind_threadpool(py::module &m, const std::string &type_name)
 {
     py::class_<tp::ThreadPool<Ret, Args...>>(m, type_name.c_str())
-        .def(py::init<std::uint64_t, std::uint32_t, std::function<Ret(Args...)>, std::vector<std::string>>(),
+        .def(py::init<std::uint64_t, std::uint32_t, std::function<Ret(Args...)>, std::vector<std::tuple<Args...>>>(),
              "Thread pool used for parallel feature extraction.",
-             py::arg("mem_max"), py::arg("jobs_max"), py::arg("extractor_function"), py::arg("paths"))
+             py::arg("mem_max"), py::arg("jobs_max"), py::arg("func"), py::arg("args"))
         .def("get_result_queue", &tp::ThreadPool<Ret, Args...>::get_result_queue, py::return_value_policy::reference, "Returns reference to the queue which is used to output results from feature extraction.")
         .def("start_threadpool", &tp::ThreadPool<Ret, Args...>::start_threadpool, "Starts the threadpool. Has to be called after 'get_result_queue', otherwise extracted features can only be accessed after completion of all feature extractions.")
         .def("jobs_completed", &tp::ThreadPool<Ret, Args...>::jobs_completed, "Returns true if all jobs have been completed, false otherwise.");
@@ -182,7 +182,10 @@ static void bind_MPSCQueue(py::module &m, const std::string &type_name)
 
 PYBIND11_MODULE(gbdc, m)
 {
-    bind_threadpool<std::vector<std::tuple<std::string, std::string, std::variant<float, int, std::string>>>, std::string, std::string, std::unordered_map<std::string, size_t>>(m, "ThreadPool_Compute");
+    bind_threadpool<tp::compute_ret_t, std::string, std::string, std::unordered_map<std::string, long>>(m, "ThreadPool_Compute");
+    bind_MPSCQueue<tp::compute_ret_t>(m, "MPSCQueue_Compute");
+    // bind_threadpool<std::vector<std::tuple<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::variant<double, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>>, std::allocator<std::tuple<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::variant<double, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>>>>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, long, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>> const, long>>>>(m, "ThreadPool_Compute");
+    // bind_MPSCQueue<std::vector<std::tuple<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>, std::variant<double, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char>>>>>>(m, "MPSCQueue");
     m.def("extract_base_features", py::overload_cast<const std::string, const size_t, const size_t>(&extract_features<CNF::BaseFeatures>), "Extract base features", py::arg("filepath"), py::arg("rlim"), py::arg("mlim"));
     m.def("extract_base_features", py::overload_cast<const std::string>(&extract_features<CNF::BaseFeatures>), "Extract base features", py::arg("filepath"));
     m.def("extract_wcnf_base_features", py::overload_cast<const std::string, const size_t, const size_t>(&extract_features<WCNF::BaseFeatures>), "Extract wcnf base features", py::arg("filepath"), py::arg("rlim"), py::arg("mlim"));
