@@ -7,3 +7,4 @@ add_library(util OBJECT
 )
 
 add_subdirectory(threadpool)
+add_subdirectory(pybind11)

@@ -5,6 +5,7 @@
 #include <thread>
 #include <iostream>
 #include <mutex>
+#include <barrier>
 #include <atomic>
 #include "../../extract/CNFBaseFeatures.h"
 #include "../../extract/CNFGateFeatures.h"
@@ -14,10 +15,9 @@
 namespace threadpool
 {
 
-    template class ThreadPool<compute_ret_t, std::string,std::string, std::unordered_map<std::string, long>>;
-    // template class ThreadPool<std::vector<std::tuple<std::string, std::string, std::variant<double, long, std::string>>>,std::string, std::string, std::unordered_map<std::string, long>>;
     template class ThreadPool<std::string, std::string>;
-    template class ThreadPool<std::vector<double>,std::string>;
+    template class ThreadPool<std::vector<double>, std::string>;
+    template class ThreadPool<extract_ret_t, extract_arg_t>;
 
     thread_local thread_data_t *tl_data;
     thread_local std::uint64_t tl_id = SENTINEL_ID;
@@ -31,6 +31,7 @@ namespace threadpool
     template <typename Ret, typename... Args>
     void ThreadPool<Ret, Args...>::start_threadpool()
     {
+        go = true;
         csv_t csv("data.csv", {"time", "allocated", "reserved", "jobs"});
         size_t tp, total_allocated;
         size_t begin = std::chrono::steady_clock::now().time_since_epoch().count();
@@ -55,6 +56,8 @@ namespace threadpool
         tl_id = thread_id_counter.fetch_add(1, relaxed);
         tl_data = &thread_data[tl_id];
         bool terminated = false;
+        while (!go)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         while (next_job())
         {
             if (terminated)
@@ -65,7 +68,7 @@ namespace threadpool
             wait_for_starting_permission();
             try
             {
-                auto result = std::apply(func, in_process[tl_id].arg);
+                auto result = std::apply(func, in_process[tl_id].args);
                 output_result(result, true);
                 finish_job();
             }
@@ -105,6 +108,7 @@ namespace threadpool
     template <typename Ret, typename... Args>
     void ThreadPool<Ret, Args...>::finish_work()
     {
+        results.quit();
         ++threads_finished;
     }
 
@@ -168,7 +172,7 @@ namespace threadpool
     void ThreadPool<Ret, Args...>::output_result(const Ret result, const bool success)
     {
         debug_msg("Extraction " + std::string(success ? " " : " not ") + "succesful!\n");
-        results.push({result, success});
+        results.push({result, success, std::get<std::string>(in_process[tl_id].args)});
     }
 
     template <typename Ret, typename... Args>

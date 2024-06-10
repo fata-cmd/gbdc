@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <mutex>
 #include <atomic>
+#include <barrier>
 #include "MPSCQueue.h"
 #include "Util.h"
 #include <tuple>
@@ -32,10 +33,14 @@ namespace threadpool
     using compute_ret_t = std::vector<std::tuple<std::string, std::string, std::variant<double, long, std::string>>>;
     using compute_arg_t = std::tuple<std::string, std::string, std::unordered_map<std::string, long>>;
     using compute_t = std::tuple<compute_ret_t, compute_arg_t>;
-    template <typename T>
-    using result_t = std::tuple<T, bool>;
-    using extract_t = std::vector<double, std::allocator<double>>(std::string);
+    using extract_ret_t = std::unordered_map<std::string, std::variant<double, std::string>>;
+    ;
+    using extract_arg_t = std::string;
 
+    template <typename T>
+    // result consists of result of computation, bool indicating whether computation was successful
+    // and string to file
+    using result_t = std::tuple<T, bool, std::string>;
     inline constexpr std::uint64_t buffer_per_job = 1e7;
     inline constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
     inline constexpr std::memory_order relaxed = std::memory_order_relaxed;
@@ -69,6 +74,7 @@ namespace threadpool
         std::atomic<std::uint32_t> thread_id_counter = 0;
         std::atomic<size_t> termination_counter = 0;
         std::mutex jobs_m;
+        bool go = false;
         MPSCQueue<result_t<Ret>> results;
         std::function<Ret(Args...)> func;
 

@@ -139,12 +139,21 @@ extern void *malloc(size_t size)
                     terminate(size);
             }
             inc_allocated(size + alignment);
-        }
-        /* call read malloc procedure in libc */
-        ret = (*real_malloc)(size + alignment);
 
-        /* prepend allocation size and check sentinel */
-        *(size_t *)ret = size + alignment;
+            /* call read malloc procedure in libc */
+            ret = (*real_malloc)(size + alignment);
+
+            /* prepend allocation size and check sentinel */
+            *(size_t *)ret = (size + alignment);
+        }
+        else
+        {
+            /* call read malloc procedure in libc */
+            ret = (*real_malloc)(size + alignment);
+
+            /* set size to 0 for blocks that have been allocated by SENTINEL-threads*/
+            *(size_t *)ret = 0UL;
+        }
         *(size_t *)((char *)ret + alignment - sizeof(size_t)) = sentinel;
 
         return (char *)ret + alignment;

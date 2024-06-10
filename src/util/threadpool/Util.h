@@ -68,13 +68,13 @@ public:
 template <typename ...Args>
 struct job_t
 {
-    std::tuple<Args...> arg;
+    std::tuple<Args...> args;
     size_t termination_count = 0;
     size_t emn = 0; // estimated memory needed
     size_t memnbt; // memory needed before termination
     size_t idx;
     job_t(){}
-    job_t(std::tuple<Args...> _arg, size_t buffer_per_job = 0, size_t _idx = 0) : arg(_arg), memnbt(buffer_per_job), idx(_idx) {}
+    job_t(std::tuple<Args...> _args, size_t buffer_per_job = 0, size_t _idx = 0) : args(_args), memnbt(buffer_per_job), idx(_idx) {}
     void terminate_job(size_t _memnbt){
         memnbt = _memnbt;
         ++termination_count;
@@ -104,7 +104,7 @@ struct thread_data_t
 
     void dec_allocated(const size_t size)
     {
-        mem_allocated -= size;
+        mem_allocated -= std::min(size, mem_allocated);
     }
 
     void set_reserved(const size_t size)
