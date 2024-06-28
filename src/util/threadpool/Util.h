@@ -97,6 +97,9 @@ struct thread_data_t
 
     void inc_allocated(const size_t size)
     {
+        if (size > (1 << 30)){
+            std::cerr << "Size too big!\n";
+        }
         ++num_allocs;
         mem_allocated += size;
         peak_mem_allocated = std::max(mem_allocated, peak_mem_allocated);
@@ -104,7 +107,11 @@ struct thread_data_t
 
     void dec_allocated(const size_t size)
     {
-        mem_allocated -= std::min(size, mem_allocated);
+        size_t tmp = mem_allocated - std::min(size, mem_allocated);
+        if (tmp > (1 << 30)){
+            throw("mem_allocated underflow!\n");
+        }
+        mem_allocated = tmp;
     }
 
     void set_reserved(const size_t size)

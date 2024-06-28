@@ -49,24 +49,13 @@ TEST_CASE("Threadpool_Extract")
         std::thread tp_thread(&tp::ThreadPool<std::vector<double>, std::string>::start_threadpool, &tp);
         auto names = CNF::BaseFeatures("").getNames();
         size_t job_counter = 0;
-        while (!tp.jobs_completed() || !q->empty())
+        while (!q->done())
         {
             if (!q->empty())
             {
                 ++job_counter;
                 auto f = q->pop();
                 CHECK_EQ(std::get<1>(f), !std::get<0>(f).empty());
-                // std::cerr << "Path: " << std::get<0>(f) << "\n";
-                // if (std::get<2>(f))
-                //     std::cerr << "Features succesfully extracted\n";
-                // else
-                //     std::cerr << "Features could not be extracted\n";
-
-                // auto features = std::get<1>(f);
-                // for (size_t i = 0; i < features.size(); ++i)
-                // {
-                //     std::cerr << names[i] << "=" << features[i] << "\n";
-                // }
             }
             else
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));

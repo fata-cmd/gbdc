@@ -38,6 +38,7 @@
 #include <cassert>
 #include <functional>
 #include <atomic>
+#include <bit>
 #include <mutex>
 #include "Util.h"
 #include "ThreadPool.h"
@@ -45,9 +46,6 @@
 /* to each allocation additional data is added for bookkeeping. due to
  * alignment requirements, we can optionally add more than just one integer. */
 static const size_t alignment = 16; /* bytes (>= 2*sizeof(size_t)) */
-
-/* set to true after first allocation, used to check for memory corruption*/
-static bool check_sentinel = false;
 
 /* function pointer to the real procedures, loaded using dlsym */
 typedef void *(*malloc_type)(size_t);
@@ -59,9 +57,9 @@ static free_type real_free = NULL;
 static realloc_type real_realloc = NULL;
 
 /* a sentinel value prefixed to each allocation */
-static const size_t sentinel = 0xDEADC0DE;
-
-static const size_t overhead = alignment + sizeof(size_t); // 24 bytes overhead per allocation
+inline constexpr size_t sentinel = 0xDEADC0DE;
+inline constexpr size_t TID_MASK = 0xFF00000000000000;
+inline constexpr size_t TID_SHIFT = std::__countr_zero(TID_MASK);
 
 /* a simple memory heap for allocations prior to dlsym loading */
 #define INIT_HEAP_SIZE 512 * 512
@@ -78,15 +76,15 @@ void unreserve_memory(size_t size)
     reserved.fetch_sub(size, relaxed);
 }
 
-void inc_allocated(size_t size)
+void inc_allocated(size_t tid, size_t size)
 {
-    tl_data->inc_allocated(size);
+    tdp->operator[](tid).inc_allocated(size);
 }
 
-void dec_allocated(size_t size)
+void dec_allocated(size_t tid, size_t size)
 {
-    unreserve_memory(tl_data->rmem_not_needed(size));
-    tl_data->dec_allocated(size);
+    unreserve_memory(tdp->operator[](tid).rmem_not_needed(size));
+    tdp->operator[](tid).dec_allocated(size);
 }
 
 size_t threshold()
@@ -97,7 +95,7 @@ size_t threshold()
 
 bool can_alloc(size_t size)
 {
-    if (size <= alignment)
+    if (size == 0)
         return true;
     bool exchanged = false;
     auto _reserved = reserved.load(relaxed);
@@ -111,19 +109,49 @@ void terminate(size_t lrq)
 {
     // exception allocation needed because of malloc call during libc exception allocation
     tl_data->exception_alloc = true;
-    throw TerminationRequest(std::max(tl_data->mem_allocated + lrq, std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved)));
+    const size_t a = tl_data->mem_allocated + lrq;
+    const size_t b = std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved);
+    if (a > (1 << 30) || b > (1 << 30))
+    {
+        throw;
+    }
+    throw TerminationRequest(std::max(a, b));
 }
 
 /****************************************************/
 /* exported symbols that overlay the libc functions */
 /****************************************************/
 
+bool realloced = false, calloced = false;
+
+size_t size_and_tid(size_t size)
+{
+    return size | (tl_id << TID_SHIFT);
+}
+
+size_t get_tid(size_t data)
+{
+    return (data & TID_MASK) >> TID_SHIFT;
+}
+
+size_t get_size(size_t data)
+{
+    return data & ~TID_MASK;
+}
+
+size_t get_tid(void *data)
+{
+    return (*(size_t *)data & TID_MASK) >> TID_SHIFT;
+}
+
+size_t get_size(void *data)
+{
+    return *(size_t *)data & ~TID_MASK;
+}
+
 /* exported malloc symbol that overrides loading from libc */
 extern void *malloc(size_t size)
 {
-    if (!check_sentinel)
-        check_sentinel = true;
-
     void *ret;
 
     if (size == 0)
@@ -131,32 +159,17 @@ extern void *malloc(size_t size)
 
     if (real_malloc)
     {
-        if (tl_id != SENTINEL_ID)
+        if (tl_id != UNTRACKED)
         {
-            while (!can_alloc(tl_data->rmem_needed(size + alignment)))
+            while (!can_alloc(tl_data->rmem_needed(size)))
             {
                 if (termination_ongoing.try_lock())
                     terminate(size);
             }
-            inc_allocated(size + alignment);
-
-            /* call read malloc procedure in libc */
-            ret = (*real_malloc)(size + alignment);
-
-            /* prepend allocation size and check sentinel */
-            *(size_t *)ret = (size + alignment);
+            inc_allocated(tl_id, size);
         }
-        else
-        {
-            /* call read malloc procedure in libc */
-            ret = (*real_malloc)(size + alignment);
-
-            /* set size to 0 for blocks that have been allocated by SENTINEL-threads*/
-            *(size_t *)ret = 0UL;
-        }
-        *(size_t *)((char *)ret + alignment - sizeof(size_t)) = sentinel;
-
-        return (char *)ret + alignment;
+        /* call read malloc procedure in libc */
+        ret = (*real_malloc)(size + alignment);
     }
     else
     {
@@ -168,13 +181,11 @@ extern void *malloc(size_t size)
 
         ret = init_heap + init_heap_use;
         init_heap_use += alignment + size;
-
-        /* prepend allocation size and check sentinel */
-        *(size_t *)ret = size;
-        *(size_t *)((char *)ret + alignment - sizeof(size_t)) = sentinel;
-
-        return (char *)ret + alignment;
     }
+    /* set size to 0 for blocks that have been allocated by untracked threads*/
+    *(size_t *)ret = size_and_tid(size);
+    *(size_t *)((char *)ret + alignment - sizeof(size_t)) = sentinel;
+    return (char *)ret + alignment;
 }
 
 /* exported free symbol that overrides loading from libc */
@@ -194,24 +205,22 @@ extern void free(void *ptr)
     if (!real_free)
     {
         fprintf(stderr, PPREFIX "free(%p) outside init heap and without real_free !!!\n", ptr);
-        return;
+        throw;
     }
 
-    if (check_sentinel)
-    {
-        ptr = (char *)ptr - alignment;
+    ptr = (char *)ptr - alignment;
 
-        if (*(size_t *)((char *)ptr + alignment - sizeof(size_t)) != sentinel)
-        {
-            std::cerr << tl_id << "\n";
-            fprintf(stderr, PPREFIX "In free(): free(%p) has no sentinel !!! memory corruption?\n", ptr);
-            throw;
-        }
-        if (tl_id != SENTINEL_ID)
-        {
-            size = *(size_t *)ptr;
-            dec_allocated(size);
-        }
+    if (*(size_t *)((char *)ptr + alignment - sizeof(size_t)) != sentinel)
+    {
+        std::cerr << "Thread-ID: " << tl_id << "\n";
+        fprintf(stderr, PPREFIX "In free(): free(%p) has no sentinel !!! memory corruption?\n", ptr);
+        throw;
+    }
+
+    if (get_tid(ptr) != UNTRACKED)
+    {
+        size = get_size(ptr);
+        dec_allocated(get_tid(ptr), size);
     }
 
     (*real_free)(ptr);
@@ -221,6 +230,7 @@ extern void free(void *ptr)
  * our malloc */
 extern void *calloc(size_t nmemb, size_t size)
 {
+    calloced = true;
     void *ret;
     size *= nmemb;
     if (!size)
@@ -233,6 +243,7 @@ extern void *calloc(size_t nmemb, size_t size)
 /* exported realloc() symbol that overrides loading from libc */
 extern void *realloc(void *ptr, size_t size)
 {
+    realloced = true;
     void *newptr;
     size_t oldsize;
 
@@ -248,20 +259,19 @@ extern void *realloc(void *ptr, size_t size)
             throw;
         }
 
-        oldsize = *(size_t *)ptr;
+        oldsize = get_size(ptr);
 
         if (oldsize >= size)
         {
             /* keep old area, just reduce the size */
-            *(size_t *)ptr = size;
+            *(size_t *)ptr = size_and_tid(size);
             return (char *)ptr + alignment;
         }
         else
         {
             /* allocate new area and copy data */
-            ptr = (char *)ptr + alignment;
             newptr = malloc(size);
-            memcpy(newptr, ptr, oldsize);
+            memcpy(newptr, (char *)ptr + alignment, oldsize);
             free(ptr);
             return newptr;
         }
@@ -286,19 +296,19 @@ extern void *realloc(void *ptr, size_t size)
         throw;
     }
 
-    oldsize = *(size_t *)ptr;
+    oldsize = get_size(ptr);
 
-    if (tl_id != SENTINEL_ID)
+    if (get_tid(ptr) != UNTRACKED)
     {
-        if (oldsize > (size + alignment))
-            dec_allocated(oldsize - (size + alignment));
+        if (oldsize > size)
+            dec_allocated(get_tid(ptr), oldsize - size);
         else
-            inc_allocated((size + alignment) - oldsize);
+            inc_allocated(get_tid(ptr), size - oldsize);
     }
 
     newptr = (*real_realloc)(ptr, alignment + size);
 
-    *(size_t *)newptr = size + alignment;
+    *(size_t *)newptr = size_and_tid(size);
 
     return (char *)newptr + alignment;
 }

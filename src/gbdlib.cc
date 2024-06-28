@@ -51,15 +51,15 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 namespace py = pybind11;
 namespace tp = threadpool;
 
-
 template <typename Ret>
 static void bind_MPSCQueue(py::module &m, const std::string &type_name)
 {
-    py::class_<MPSCQueue<tp::result_t<Ret>>>(m, type_name.c_str())
+    using q = MPSCQueue<tp::result_t<Ret>>;
+    py::class_<q, std::shared_ptr<q>>(m, type_name.c_str())
         .def(py::init<std::uint16_t>())
-        .def("pop", &MPSCQueue<tp::result_t<Ret>>::pop, "Pop an element from the queue in a synchronized manner.")
-        .def("empty", &MPSCQueue<tp::result_t<Ret>>::empty, "Returns true if queue is empty, false otherwise.")
-        .def("done", &MPSCQueue<tp::result_t<Ret>>::done, "Returns true if producers are done, false otherwise.");
+        .def("pop", &q::pop, "Pop an element from the queue in a synchronized manner.")
+        .def("empty", &q::empty, "Returns true if queue is empty, false otherwise.")
+        .def("done", &q::done, "Returns true if producers are done, false otherwise.");
 }
 
 PYBIND11_MODULE(gbdc, m)

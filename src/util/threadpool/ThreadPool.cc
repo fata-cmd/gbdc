@@ -20,7 +20,7 @@ namespace threadpool
     template class ThreadPool<extract_ret_t, extract_arg_t>;
 
     thread_local thread_data_t *tl_data;
-    thread_local std::uint64_t tl_id = SENTINEL_ID;
+    thread_local std::uint64_t tl_id = UNTRACKED;
     std::mutex termination_ongoing;
 
     std::atomic<size_t> peak = 0, reserved = 0;
@@ -36,7 +36,7 @@ namespace threadpool
         size_t tp, total_allocated;
         size_t begin = std::chrono::steady_clock::now().time_since_epoch().count();
         const size_t i = 0;
-        while (!jobs_completed())
+        while (!results->done())
         {
             total_allocated = 0;
             std::for_each(thread_data.begin(), thread_data.end(), [&](const thread_data_t &td)
@@ -47,6 +47,7 @@ namespace threadpool
         }
         for (uint i = 0; i < threads.size(); ++i)
             threads[i].join();
+        debug_msg("Number of references to queue left: " + std::to_string(results.use_count()));
         // std::cerr << "Peak RSS: " << getPeakRSS() << std::endl;
     }
 
@@ -108,8 +109,7 @@ namespace threadpool
     template <typename Ret, typename... Args>
     void ThreadPool<Ret, Args...>::finish_work()
     {
-        results.quit();
-        ++threads_finished;
+        results->quit();
     }
 
     template <typename Ret, typename... Args>
@@ -131,7 +131,7 @@ namespace threadpool
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        ++threads_working;
+        threads_working.fetch_add(1, relaxed);
         debug_msg("Start job with index " + std::to_string(in_process[tl_id].idx) + " ...");
     }
 
@@ -171,8 +171,8 @@ namespace threadpool
     template <typename Ret, typename... Args>
     void ThreadPool<Ret, Args...>::output_result(const Ret result, const bool success)
     {
-        debug_msg("Extraction " + std::string(success ? " " : " not ") + "succesful!\n");
-        results.push({result, success, std::get<std::string>(in_process[tl_id].args)});
+        debug_msg("Extraction" + std::string(success ? " " : " not ") + "succesful!\n");
+        results->push({result, success, std::get<std::string>(in_process[tl_id].args)});
     }
 
     template <typename Ret, typename... Args>
@@ -196,22 +196,18 @@ namespace threadpool
     }
 
     template <typename Ret, typename... Args>
-    MPSCQueue<result_t<Ret>> *ThreadPool<Ret, Args...>::get_result_queue()
+    std::shared_ptr<MPSCQueue<result_t<Ret>>> ThreadPool<Ret, Args...>::get_result_queue()
     {
-        return &results;
+        return results;
     }
 
     template <typename Ret, typename... Args>
-    bool ThreadPool<Ret, Args...>::jobs_completed()
-    {
-        return threads_finished.load(relaxed) == threads.size();
-    }
-
-    template <typename Ret, typename... Args>
-    ThreadPool<Ret, Args...>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, std::function<Ret(Args...)> _func, std::vector<std::tuple<Args...>> args) : in_process(_jobs_max), jobs_max(_jobs_max), jobs(jobs_max), results(jobs_max), func(_func)
+    ThreadPool<Ret, Args...>::ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, std::function<Ret(Args...)> _func, std::vector<std::tuple<Args...>> args) : in_process(_jobs_max), jobs(_jobs_max), func(_func)
     {
         std::cerr << "Initialising thread pool: \nMemory: " << _mem_max << "\nThreads: " << _jobs_max << std::endl;
         mem_max = _mem_max;
+        tdp = &thread_data;
+        results = std::make_shared<MPSCQueue<result_t<Ret>>>(_jobs_max);
         init_jobs(args);
         init_threads(_jobs_max);
     }

@@ -34,6 +34,8 @@ public:
     T pop()
     {
         std::unique_lock<std::mutex> l(m);
+        if (q.empty())
+            return T();
         T t = q.front();
         q.pop();
         return t;

@@ -42,7 +42,7 @@ namespace threadpool
     // and string to file
     using result_t = std::tuple<T, bool, std::string>;
     inline constexpr std::uint64_t buffer_per_job = 1e7;
-    inline constexpr std::uint64_t SENTINEL_ID = UINT64_MAX;
+    inline constexpr std::uint64_t UNTRACKED = UINT8_MAX;
     inline constexpr std::memory_order relaxed = std::memory_order_relaxed;
 
     extern thread_local thread_data_t *tl_data;
@@ -52,6 +52,7 @@ namespace threadpool
     extern std::atomic<size_t> peak, reserved;
     extern std::atomic<uint16_t> threads_working;
     extern std::mutex termination_ongoing;
+    inline std::vector<thread_data_t> *tdp;
 
     class TerminationRequest : public std::runtime_error
     {
@@ -64,18 +65,15 @@ namespace threadpool
     class ThreadPool
     {
     private:
-        size_t jobs_max;
         MPSCQueue<job_t<Args...>> jobs;
         std::vector<std::thread> threads;
         std::vector<thread_data_t> thread_data;
         std::vector<job_t<Args...>> in_process;
-        std::atomic<std::uint32_t> threads_finished = 0;
-        std::atomic<std::uint32_t> next_job_idx = 0;
         std::atomic<std::uint32_t> thread_id_counter = 0;
         std::atomic<size_t> termination_counter = 0;
         std::mutex jobs_m;
         bool go = false;
-        MPSCQueue<result_t<Ret>> results;
+        std::shared_ptr<MPSCQueue<result_t<Ret>>> results;
         std::function<Ret(Args...)> func;
 
         /**
@@ -148,7 +146,7 @@ namespace threadpool
          */
         explicit ThreadPool(std::uint64_t _mem_max, std::uint32_t _jobs_max, std::function<Ret(Args...)> func, std::vector<std::tuple<Args...>> args);
 
-        MPSCQueue<result_t<Ret>> *get_result_queue();
+        std::shared_ptr<MPSCQueue<result_t<Ret>>> get_result_queue();
         /**
          * @brief Called by master thread at the beginning of the program. Frequently samples execution data.
          */

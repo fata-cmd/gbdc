@@ -6,3 +6,8 @@ add_library(threadpool STATIC ThreadPool.cc malloc_count.cc)
 target_link_libraries(threadpool PUBLIC ${LIBS} solver)
 target_include_directories(threadpool SYSTEM PUBLIC .)
 set_property(TARGET threadpool PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+add_library(threadpool_so SHARED ThreadPool.cc malloc_count.cc)
+target_link_libraries(threadpool_so PUBLIC ${LIBS} solver)
+target_include_directories(threadpool_so SYSTEM PUBLIC .)
+set_property(TARGET threadpool_so PROPERTY POSITION_INDEPENDENT_CODE ON)
