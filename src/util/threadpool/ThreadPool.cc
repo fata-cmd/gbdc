@@ -188,9 +188,15 @@ namespace threadpool
     template <typename Ret, typename... Args>
     void ThreadPool<Ret, Args...>::init_threads(std::uint32_t num_threads)
     {
+        thread_data.reserve(num_threads);
         for (std::uint32_t i = 0; i < num_threads; ++i)
         {
             thread_data.emplace_back();
+            for (const auto td : thread_data)
+            {
+                if (td.exception_alloc > 1)
+                    throw;
+            }
             threads.emplace_back(std::thread(&ThreadPool::work, this));
         }
     }
@@ -206,7 +212,6 @@ namespace threadpool
     {
         std::cerr << "Initialising thread pool: \nMemory: " << _mem_max << "\nThreads: " << _jobs_max << std::endl;
         mem_max = _mem_max;
-        tdp = &thread_data;
         results = std::make_shared<MPSCQueue<result_t<Ret>>>(_jobs_max);
         init_jobs(args);
         init_threads(_jobs_max);

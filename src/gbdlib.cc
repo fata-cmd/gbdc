@@ -62,6 +62,66 @@ static void bind_MPSCQueue(py::module &m, const std::string &type_name)
         .def("done", &q::done, "Returns true if producers are done, false otherwise.");
 }
 
+py::dict cnf2kis(const std::string filename, const std::string output, const size_t maxEdges, const size_t maxNodes)
+{
+    // std::unordered_map<std::string, std::variant<std::string, unsigned>> dict;
+    py::dict dict;
+
+    IndependentSetFromCNF gen(filename.c_str());
+    unsigned nNodes = gen.numNodes();
+    unsigned nEdges = gen.numEdges();
+    unsigned minK = gen.minK();
+
+    dict[py::str("nodes")] = nNodes;
+    dict[py::str("edges")] = nEdges;
+    dict[py::str("k")] = minK;
+
+    if ((maxEdges > 0 && nEdges > maxEdges) || (maxNodes > 0 && nNodes > maxNodes))
+    {
+        dict[py::str("hash")] = "fileout";
+        return dict;
+    }
+
+    gen.generate_independent_set_problem(output.c_str());
+    dict[py::str("local")] = output;
+
+    dict[py::str("hash")] = CNF::gbdhash(output.c_str());
+    return dict;
+}
+
+template <typename Extractor>
+py::dict extract_features(const std::string filepath, const size_t rlim, const size_t mlim)
+{
+    // tp::extract_ret_t emergency;
+    py::dict emergency;
+    ResourceLimits limits(rlim, mlim);
+    limits.set_rlimits();
+    try
+    {
+        Extractor stats(filepath.c_str());
+        stats.extract();
+        py::dict dict;
+        const auto names = stats.getNames();
+        const auto features = stats.getFeatures();
+        // dict[py::str("base_features_runtime")] = (double)limits.get_runtime();
+        for (size_t i = 0; i < features.size(); ++i)
+        {
+            dict[py::str(names[i])] = features[i];
+        }
+        return dict;
+    }
+    catch (TimeLimitExceeded &e)
+    {
+        // emergency[py::str("base_features_runtime")] = "timeout";
+        return emergency;
+    }
+    catch (MemoryLimitExceeded &e)
+    {
+        // emergency[py::str("base_features_runtime")] = "memout";
+        return emergency;
+    }
+}
+
 PYBIND11_MODULE(gbdc, m)
 {
     bind_MPSCQueue<tp::extract_ret_t>(m, "MPSCQueue_Extract");

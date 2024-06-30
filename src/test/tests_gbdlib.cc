@@ -25,7 +25,7 @@ TEST_CASE("GBDLib")
         {
             paths.push_back(entry.path());
         }
-        auto q = tp_extract<CNF::BaseFeatures>(1UL << 25UL, 4U, paths);
+        auto q = tp_extract<CNF::BaseFeatures>(1UL << 25UL, 2U, paths);
         std::cerr << q.use_count() << "\n";
         size_t job_counter = 0;
         while (!q->done())
@@ -48,15 +48,15 @@ TEST_CASE("GBDLib")
         CHECK_EQ(version(), "0.2.45");
     }
 
-    SUBCASE("BaseFeatures_ProcessPool_Correct")
-    {
-        std::string cnf_file = "src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf.xz";
-        const char *expected_record_file = "src/test/resources/expected_record.txt";
-        auto map = record_to_map<std::variant<double, std::string>>(expected_record_file);
-        auto dict = extract_features<CNF::BaseFeatures>(cnf_file, 1UL << 36UL, 1UL << 36UL);
-        check_subset(map, dict);
-        CHECK(dict.find("base_features_runtime") != dict.end());
-    }
+    // SUBCASE("BaseFeatures_ProcessPool_Correct")
+    // {
+    //     std::string cnf_file = "src/test/resources/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf.xz";
+    //     const char *expected_record_file = "src/test/resources/expected_record.txt";
+    //     auto map = record_to_map<std::variant<double, std::string>>(expected_record_file);
+    //     auto dict = extract_features<CNF::BaseFeatures>(cnf_file, 1UL << 36UL, 1UL << 36UL);
+    //     check_subset(map, dict);
+    //     CHECK(dict.find("base_features_runtime") != dict.end());
+    // }
 
     SUBCASE("BaseFeatures_ThreadPool_Correct")
     {

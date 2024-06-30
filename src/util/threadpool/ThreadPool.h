@@ -37,9 +37,8 @@ namespace threadpool
     ;
     using extract_arg_t = std::string;
 
+    // result consists of result of computation, bool indicating whether computation was successful and string to file
     template <typename T>
-    // result consists of result of computation, bool indicating whether computation was successful
-    // and string to file
     using result_t = std::tuple<T, bool, std::string>;
     inline constexpr std::uint64_t buffer_per_job = 1e7;
     inline constexpr std::uint64_t UNTRACKED = UINT8_MAX;
@@ -52,7 +51,6 @@ namespace threadpool
     extern std::atomic<size_t> peak, reserved;
     extern std::atomic<uint16_t> threads_working;
     extern std::mutex termination_ongoing;
-    inline std::vector<thread_data_t> *tdp;
 
     class TerminationRequest : public std::runtime_error
     {

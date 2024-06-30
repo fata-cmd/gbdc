@@ -70,64 +70,6 @@ static std::string version()
     return "Error: Version not found in setup.py";
 }
 
-static auto cnf2kis(const std::string filename, const std::string output, const size_t maxEdges, const size_t maxNodes)
-{
-    std::unordered_map<std::string, std::variant<std::string, unsigned>> dict;
-
-    IndependentSetFromCNF gen(filename.c_str());
-    unsigned nNodes = gen.numNodes();
-    unsigned nEdges = gen.numEdges();
-    unsigned minK = gen.minK();
-
-    dict["nodes"] = nNodes;
-    dict["edges"] = nEdges;
-    dict["k"] = minK;
-
-    if ((maxEdges > 0 && nEdges > maxEdges) || (maxNodes > 0 && nNodes > maxNodes))
-    {
-        dict["hash"] = "fileout";
-        return dict;
-    }
-
-    gen.generate_independent_set_problem(output.c_str());
-    dict["local"] = output;
-
-    dict["hash"] = CNF::gbdhash(output.c_str());
-    return dict;
-}
-
-template <typename Extractor>
-static auto extract_features(const std::string filepath, const size_t rlim, const size_t mlim)
-{
-    tp::extract_ret_t emergency;
-    ResourceLimits limits(rlim, mlim);
-    limits.set_rlimits();
-    try
-    {
-        Extractor stats(filepath.c_str());
-        stats.extract();
-        tp::extract_ret_t dict;
-        const auto names = stats.getNames();
-        const auto features = stats.getFeatures();
-        dict["base_features_runtime"] = (double)limits.get_runtime();
-        for (size_t i = 0; i < features.size(); ++i)
-        {
-            dict[names[i]] = features[i];
-        }
-        return dict;
-    }
-    catch (TimeLimitExceeded &e)
-    {
-        emergency["base_features_runtime"] = "timeout";
-        return emergency;
-    }
-    catch (MemoryLimitExceeded &e)
-    {
-        emergency["base_features_runtime"] = "memout";
-        return emergency;
-    }
-}
-
 template <typename Extractor>
 static auto tp_extract_features(const std::string filepath)
 {

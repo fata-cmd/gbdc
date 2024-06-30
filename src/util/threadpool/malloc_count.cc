@@ -62,7 +62,7 @@ inline constexpr size_t TID_MASK = 0xFF00000000000000;
 inline constexpr size_t TID_SHIFT = std::__countr_zero(TID_MASK);
 
 /* a simple memory heap for allocations prior to dlsym loading */
-#define INIT_HEAP_SIZE 512 * 512
+#define INIT_HEAP_SIZE 1024 * 1024
 static char init_heap[INIT_HEAP_SIZE];
 static size_t init_heap_use = 0;
 
@@ -73,18 +73,29 @@ using namespace threadpool;
 
 void unreserve_memory(size_t size)
 {
-    reserved.fetch_sub(size, relaxed);
+    assert((reserved.load(std::memory_order_acquire) >= size));
+    assert((reserved.load(std::memory_order_acquire) <= mem_max));
+    reserved.fetch_sub(size, std::memory_order_relaxed);
+    assert((reserved.load(std::memory_order_acquire) <= mem_max));
 }
 
 void inc_allocated(size_t tid, size_t size)
 {
-    tdp->operator[](tid).inc_allocated(size);
+    if (tid != tl_id)
+    {
+        return;
+    }
+    tl_data->inc_allocated(size);
 }
 
 void dec_allocated(size_t tid, size_t size)
 {
-    unreserve_memory(tdp->operator[](tid).rmem_not_needed(size));
-    tdp->operator[](tid).dec_allocated(size);
+    if (tid != tl_id)
+    {
+        return;
+    }
+    unreserve_memory(tl_data->rmem_not_needed(size));
+    tl_data->dec_allocated(size);
 }
 
 size_t threshold()
@@ -95,6 +106,10 @@ size_t threshold()
 
 bool can_alloc(size_t size)
 {
+    if (tl_data->exception_alloc && size > 10000)
+        throw;
+    if ((reserved.load(relaxed) > mem_max))
+        throw;
     if (size == 0)
         return true;
     bool exchanged = false;
@@ -102,6 +117,9 @@ bool can_alloc(size_t size)
     while ((tl_data->exception_alloc || ((_reserved + size + threshold()) <= mem_max)) &&
            !(exchanged = reserved.compare_exchange_weak(_reserved, _reserved + size, relaxed, relaxed)))
         ;
+    if ((reserved.load(relaxed) > mem_max))
+        throw;
+
     return exchanged;
 }
 
@@ -109,20 +127,12 @@ void terminate(size_t lrq)
 {
     // exception allocation needed because of malloc call during libc exception allocation
     tl_data->exception_alloc = true;
-    const size_t a = tl_data->mem_allocated + lrq;
-    const size_t b = std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved);
-    if (a > (1 << 30) || b > (1 << 30))
-    {
-        throw;
-    }
-    throw TerminationRequest(std::max(a, b));
+    throw TerminationRequest(std::max(tl_data->mem_allocated + lrq, std::max(tl_data->peak_mem_allocated, tl_data->mem_reserved)));
 }
 
 /****************************************************/
 /* exported symbols that overlay the libc functions */
 /****************************************************/
-
-bool realloced = false, calloced = false;
 
 size_t size_and_tid(size_t size)
 {
@@ -141,12 +151,12 @@ size_t get_size(size_t data)
 
 size_t get_tid(void *data)
 {
-    return (*(size_t *)data & TID_MASK) >> TID_SHIFT;
+    return get_tid(*(size_t *)data);
 }
 
 size_t get_size(void *data)
 {
-    return *(size_t *)data & ~TID_MASK;
+    return get_size(*(size_t *)data);
 }
 
 /* exported malloc symbol that overrides loading from libc */
@@ -156,6 +166,9 @@ extern void *malloc(size_t size)
 
     if (size == 0)
         return NULL;
+
+    // if (!real_malloc)
+        // real_malloc = (malloc_type)dlsym(RTLD_NEXT, "malloc");
 
     if (real_malloc)
     {
@@ -202,6 +215,9 @@ extern void free(void *ptr)
         return;
     }
 
+    // if (!real_free)
+    //     real_free = (free_type)dlsym(RTLD_NEXT, "free");
+
     if (!real_free)
     {
         fprintf(stderr, PPREFIX "free(%p) outside init heap and without real_free !!!\n", ptr);
@@ -219,8 +235,7 @@ extern void free(void *ptr)
 
     if (get_tid(ptr) != UNTRACKED)
     {
-        size = get_size(ptr);
-        dec_allocated(get_tid(ptr), size);
+        dec_allocated(get_tid(ptr), get_size(ptr));
     }
 
     (*real_free)(ptr);
@@ -230,7 +245,6 @@ extern void free(void *ptr)
  * our malloc */
 extern void *calloc(size_t nmemb, size_t size)
 {
-    calloced = true;
     void *ret;
     size *= nmemb;
     if (!size)
@@ -243,7 +257,6 @@ extern void *calloc(size_t nmemb, size_t size)
 /* exported realloc() symbol that overrides loading from libc */
 extern void *realloc(void *ptr, size_t size)
 {
-    realloced = true;
     void *newptr;
     size_t oldsize;
 
@@ -305,6 +318,9 @@ extern void *realloc(void *ptr, size_t size)
         else
             inc_allocated(get_tid(ptr), size - oldsize);
     }
+
+    // if (!real_realloc)
+    //     real_realloc = (realloc_type)dlsym(RTLD_NEXT, "realloc");
 
     newptr = (*real_realloc)(ptr, alignment + size);
 
