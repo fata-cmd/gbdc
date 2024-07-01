@@ -25,7 +25,9 @@ TEST_CASE("GBDLib")
         {
             paths.push_back(entry.path());
         }
-        auto q = tp_extract<CNF::BaseFeatures>(1UL << 25UL, 2U, paths);
+        paths.clear();
+        paths.push_back("src/test/resources/benchmarks/01bd0865ab694bc71d80b7d285d5777d-shuffling-2-s1480152728-of-bench-sat04-434.used-as.sat04-711.cnf.xz");
+        auto q = tp_extract<CNF::BaseFeatures>(1UL << 25UL, 1U, paths);
         std::cerr << q.use_count() << "\n";
         size_t job_counter = 0;
         while (!q->done())
